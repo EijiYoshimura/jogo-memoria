@@ -10,6 +10,8 @@ export async function syncLead(lead: LocalLead): Promise<boolean> {
     time_taken: lead.timeTaken,
     played_at: lead.playedAt,
     synced_from: 'offline-sync',
+    consented_at: lead.consentedAt,
+    consent_version: lead.consentVersion,
   })
 
   return !error
@@ -23,6 +25,8 @@ export async function syncOnlineLead(lead: Omit<LocalLead, 'localId' | 'synced'>
     time_taken: lead.timeTaken,
     played_at: lead.playedAt,
     synced_from: 'online',
+    consented_at: lead.consentedAt,
+    consent_version: lead.consentVersion,
   })
 
   return !error

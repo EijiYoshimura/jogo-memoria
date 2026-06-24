@@ -24,4 +24,11 @@ export interface GameConfig {
     }>
   }
   adminPin: string
+  lgpd?: {
+    consentVersion: string
+    dataController: string
+    purposeText: string
+    retentionMonths: number
+    privacyPolicyUrl?: string
+  }
 }
