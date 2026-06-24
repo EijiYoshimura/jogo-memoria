@@ -1,0 +1,46 @@
+{
+  "event": {
+    "id": "evento-demo-2026",
+    "name": "Evento Demo",
+    "logo": "/images/logo.png",
+    "primaryColor": "#7C3AED",
+    "backgroundColor": "#1E1B4B"
+  },
+  "game": {
+    "pairs": 4,
+    "cardImages": [
+      "/images/card-1.jpg",
+      "/images/card-2.jpg",
+      "/images/card-3.jpg",
+      "/images/card-4.jpg"
+    ],
+    "cardBack": "/images/card-back.jpg",
+    "timeLimitSeconds": 60,
+    "autoResetSeconds": 30
+  },
+  "leadForm": {
+    "title": "Preencha seus dados para jogar!",
+    "fields": [
+      {
+        "id": "name",
+        "label": "Nome completo",
+        "type": "text",
+        "required": true
+      },
+      {
+        "id": "email",
+        "label": "E-mail",
+        "type": "email",
+        "required": true
+      },
+      {
+        "id": "phone",
+        "label": "WhatsApp",
+        "type": "tel",
+        "required": false,
+        "mask": "(99) 99999-9999"
+      }
+    ]
+  },
+  "adminPin": "1234"
+}
