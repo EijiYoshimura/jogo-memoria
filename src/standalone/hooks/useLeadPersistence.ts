@@ -3,6 +3,8 @@ import { saveLead as saveLeadToDb } from '../lib/leadsDb'
 import { syncOnlineLead, syncPendingLeads } from '../lib/leadsSync'
 import { markSynced } from '../lib/leadsDb'
 
+const SYNC_INTERVAL_MS = 30_000
+
 interface SaveLeadParams {
   eventId: string
   formData: Record<string, string>
@@ -13,8 +15,10 @@ interface SaveLeadParams {
 export function useLeadPersistence() {
   useEffect(() => {
     window.addEventListener('online', syncPendingLeads)
+    const interval = setInterval(syncPendingLeads, SYNC_INTERVAL_MS)
     return () => {
       window.removeEventListener('online', syncPendingLeads)
+      clearInterval(interval)
     }
   }, [])
 
