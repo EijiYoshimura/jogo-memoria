@@ -58,17 +58,31 @@ src/
     └── styles/            # Estilos globais, tokens de design
 ```
 
+## Checklist de Setup de Projeto Novo
+
+Quando a issue for de setup/inicialização (`[TECH] Setup`), garantir antes de qualquer outra coisa:
+
+- [ ] Vitest instalado e configurado: `npm install -D vitest jsdom @testing-library/react`
+- [ ] Script `"test": "vitest run"` adicionado ao `package.json`
+- [ ] `vitest.config.ts` (ou config no `vite.config.ts`) com `environment: 'jsdom'`
+- [ ] `.gitignore` inclui `.worktrees/`, `.env.local`, `dist/`
+- [ ] `.env.example` criado com todas as variáveis necessárias (sem valores reais)
+
+**PR de setup não é aceito sem Vitest configurado e rodando.**
+
 ## Checklist de Implementação
 
 Antes de abrir PR:
 
+- [ ] Vitest configurado e `npm test` passando (obrigatório desde o setup)
+- [ ] Testes unitários escritos para toda lógica de domínio (use-cases, entities)
+- [ ] Evidência de `npm test` e `npm run build` incluída na descrição do PR
 - [ ] Implementação fiel ao design spec (pixel-perfect)
 - [ ] Todos os estados implementados: default, loading, error, empty, success
 - [ ] Responsivo em todos os breakpoints definidos
 - [ ] Acessibilidade: navegação por teclado, labels ARIA, contraste
 - [ ] Integração com API seguindo o contrato da spec técnica
 - [ ] Tratamento de erros de rede e validação
-- [ ] Testes escritos cobrindo os critérios de aceite
 - [ ] Sem `console.log` de debug
 - [ ] Sem lógica de negócio em componentes de apresentação
 - [ ] Performance: sem renderizações desnecessárias, imagens otimizadas

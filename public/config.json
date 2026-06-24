@@ -2,19 +2,21 @@
   "event": {
     "id": "evento-demo-2026",
     "name": "Evento Demo",
-    "logo": "/images/logo.png",
+    "logo": "https://placehold.co/300x120/7C3AED/white?text=Evento+Demo",
     "primaryColor": "#7C3AED",
     "backgroundColor": "#1E1B4B"
   },
   "game": {
-    "pairs": 4,
+    "pairs": 6,
     "cardImages": [
-      "/images/card-1.jpg",
-      "/images/card-2.jpg",
-      "/images/card-3.jpg",
-      "/images/card-4.jpg"
+      "https://picsum.photos/seed/mem1/400/400",
+      "https://picsum.photos/seed/mem2/400/400",
+      "https://picsum.photos/seed/mem3/400/400",
+      "https://picsum.photos/seed/mem4/400/400",
+      "https://picsum.photos/seed/mem5/400/400",
+      "https://picsum.photos/seed/mem6/400/400"
     ],
-    "cardBack": "/images/card-back.jpg",
+    "cardBack": "https://picsum.photos/seed/cardback/400/400",
     "timeLimitSeconds": 60,
     "autoResetSeconds": 30
   },

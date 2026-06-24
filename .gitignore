@@ -30,3 +30,6 @@ dist-ssr
 
 # TypeScript cache
 *.tsbuildinfo
+
+# Git worktrees
+.worktrees/
