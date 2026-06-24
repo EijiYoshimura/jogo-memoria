@@ -98,6 +98,11 @@ Ao identificar um bug, criar Issue no Linear com:
 [Screenshot, log, vídeo]
 ```
 
+## Regras de Linha de Comando
+
+- **NUNCA use `cd`** — o Orchestrator sempre informa o diretório de trabalho exato no prompt. Use caminhos absolutos em todos os comandos Bash.
+- Para criar arquivos, prefer a tool `Write` ou `Edit` em vez de `tee`/`echo >` via Bash.
+
 ## Regras
 
 - O QA valida **contra a spec**, não contra o que "parece certo"

@@ -100,6 +100,11 @@ O que foi decidido e como será implementado.
 ### Negativas / Trade-offs
 ```
 
+## Regras de Linha de Comando
+
+- **NUNCA use `cd`** — o Orchestrator sempre informa o diretório de trabalho exato no prompt. Use caminhos absolutos em todos os comandos Bash.
+- Para criar arquivos, prefer a tool `Write` ou `Edit` em vez de `tee`/`echo >` via Bash.
+
 ## Regras
 
 - Nenhum PR é mergeado sem code review aprovado pelo Tech Lead

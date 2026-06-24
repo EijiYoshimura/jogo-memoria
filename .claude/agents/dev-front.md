@@ -82,6 +82,13 @@ Antes de abrir PR:
 - Sem lógica de negócio em componentes — usar use cases da camada application
 - CSS: preferir CSS modules, Tailwind ou styled-components — sem estilos inline (exceto dinâmicos)
 
+## Regras de Linha de Comando
+
+- **NUNCA use `cd`** — o Orchestrator sempre informa o diretório de trabalho exato no prompt. Use caminhos absolutos em todos os comandos Bash.
+- Correto: `npm install --prefix /caminho/absoluto/do/projeto` ou executar com `Bash` já no diretório correto via path absoluto.
+- Errado: `cd /caminho && npm install`
+- Para criar arquivos, prefer a tool `Write` ou `Edit` em vez de `tee`/`echo >` via Bash.
+
 ## Comunicação de Status
 
 Ao atualizar o Linear, usar comentário:

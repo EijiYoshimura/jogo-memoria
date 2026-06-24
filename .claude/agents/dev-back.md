@@ -95,6 +95,13 @@ Antes de abrir PR:
 - Usar prepared statements / ORM parametrizado (sem concatenação de SQL)
 - Rate limiting em endpoints públicos
 
+## Regras de Linha de Comando
+
+- **NUNCA use `cd`** — o Orchestrator sempre informa o diretório de trabalho exato no prompt. Use caminhos absolutos em todos os comandos Bash.
+- Correto: `npm install --prefix /caminho/absoluto/do/projeto` ou executar com `Bash` já no diretório correto via path absoluto.
+- Errado: `cd /caminho && npm install`
+- Para criar arquivos, prefer a tool `Write` ou `Edit` em vez de `tee`/`echo >` via Bash.
+
 ## Comunicação de Status
 
 Ao atualizar o Linear, usar comentário:
