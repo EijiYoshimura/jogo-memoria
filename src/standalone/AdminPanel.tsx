@@ -44,12 +44,18 @@ export function AdminPanel({ config, onClose }: AdminPanelProps) {
   }, [lockedUntil])
 
   const loadStats = useCallback(async () => {
-    const all = await getAllLeads()
     const pending = await getPendingLeads()
-    setTotalLeads(all.length)
     setPendingLeads(pending.length)
-    setSyncedLeads(all.filter((l) => l.synced).length)
-  }, [])
+
+    const { count } = await supabase
+      .from('leads')
+      .select('*', { count: 'exact', head: true })
+      .eq('event_id', config.event.id)
+
+    const syncedCount = count ?? 0
+    setSyncedLeads(syncedCount)
+    setTotalLeads(syncedCount + pending.length)
+  }, [config.event.id])
 
   useEffect(() => {
     if (view === 'dashboard') {
