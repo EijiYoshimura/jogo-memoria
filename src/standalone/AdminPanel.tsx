@@ -26,6 +26,7 @@ export function AdminPanel({ config, onClose }: AdminPanelProps) {
   const [pendingLeads, setPendingLeads] = useState(0)
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncMessage, setSyncMessage] = useState('')
+  const [statsError, setStatsError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!lockedUntil) return
@@ -44,13 +45,19 @@ export function AdminPanel({ config, onClose }: AdminPanelProps) {
   }, [lockedUntil])
 
   const loadStats = useCallback(async () => {
+    setStatsError(null)
     const pending = await getPendingLeads()
     setPendingLeads(pending.length)
 
-    const { count } = await supabase
+    const { count, error } = await supabase
       .from('leads')
       .select('*', { count: 'exact', head: true })
       .eq('event_id', config.event.id)
+
+    if (error) {
+      setStatsError(`Erro ao consultar Supabase: ${error.message}. Verifique a política RLS (SELECT para anon).`)
+      return
+    }
 
     const syncedCount = count ?? 0
     setSyncedLeads(syncedCount)
@@ -226,6 +233,12 @@ export function AdminPanel({ config, onClose }: AdminPanelProps) {
   return (
     <div className="fixed inset-0 bg-gray-900 flex flex-col p-8 z-50 overflow-y-auto">
       <h2 className="text-white text-3xl font-bold mb-6">Painel Admin</h2>
+
+      {statsError && (
+        <div className="bg-red-900 border border-red-500 rounded-xl p-4 mb-6 text-red-200 text-sm">
+          {statsError}
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-4 mb-8">
         <div className="bg-gray-800 rounded-xl p-4 text-center">

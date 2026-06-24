@@ -33,13 +33,30 @@ CREATE TABLE leads (
 -- Habilitar Row Level Security
 ALTER TABLE leads ENABLE ROW LEVEL SECURITY;
 
--- Permitir apenas INSERT para usuários anônimos (sem autenticação)
+-- Permitir INSERT para usuários anônimos (captura de lead durante o jogo)
 CREATE POLICY "anon insert only"
   ON leads
   FOR INSERT
   TO anon
   WITH CHECK (true);
+
+-- Permitir SELECT para usuários anônimos (painel admin e exportação CSV)
+-- A anon key já está no bundle JS público; a proteção de UI é feita via PIN.
+CREATE POLICY "anon select"
+  ON leads
+  FOR SELECT
+  TO anon
+  USING (true);
 ```
+
+> **Se a tabela já existir** e você só precisar adicionar a política SELECT, execute apenas:
+> ```sql
+> CREATE POLICY "anon select"
+>   ON leads
+>   FOR SELECT
+>   TO anon
+>   USING (true);
+> ```
 
 - [ ] **Copiar as credenciais** em Project Settings → API:
   - `Project URL` → valor de `VITE_SUPABASE_URL`
