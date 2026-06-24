@@ -1,10 +1,11 @@
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
+import type { GameStatus } from '../domain/entities/GameSession'
 
 interface TimerProps {
+  status: GameStatus
   timeRemaining: number
-  onTick: () => void
+  onTick: (remaining: number) => void
   onTimeout: () => void
-  isRunning: boolean
 }
 
 function formatTime(seconds: number): string {
@@ -13,25 +14,22 @@ function formatTime(seconds: number): string {
   return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
 }
 
-export function Timer({ timeRemaining, onTick, onTimeout, isRunning }: TimerProps) {
-  const onTickRef = useRef(onTick)
-  const onTimeoutRef = useRef(onTimeout)
-  onTickRef.current = onTick
-  onTimeoutRef.current = onTimeout
-
+export function Timer({ status, timeRemaining, onTick, onTimeout }: TimerProps) {
   useEffect(() => {
-    if (!isRunning || timeRemaining <= 0) return
-    const interval = setInterval(() => {
-      onTickRef.current()
+    if (status !== 'playing') return
+
+    const id = setInterval(() => {
+      onTick(timeRemaining - 1)
     }, 1000)
-    return () => clearInterval(interval)
-  }, [isRunning, timeRemaining])
+
+    return () => clearInterval(id)
+  }, [status, timeRemaining, onTick])
 
   useEffect(() => {
-    if (timeRemaining <= 0 && isRunning) {
-      onTimeoutRef.current()
+    if (timeRemaining <= 0 && status === 'playing') {
+      onTimeout()
     }
-  }, [timeRemaining, isRunning])
+  }, [timeRemaining, status, onTimeout])
 
   const isUrgent = timeRemaining <= 10
 

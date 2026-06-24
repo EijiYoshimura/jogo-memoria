@@ -9,8 +9,8 @@ interface BoardProps {
 }
 
 function getGridColumns(pairs: number): number {
+  if (pairs <= 3) return 3
   if (pairs <= 6) return 4
-  if (pairs <= 8) return 4
   return 6
 }
 

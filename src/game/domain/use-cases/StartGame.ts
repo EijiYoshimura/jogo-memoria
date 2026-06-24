@@ -24,6 +24,7 @@ export function startGame(pairs: number, cardImages: string[], timeLimitSeconds:
   const shuffledCards = fisherYatesShuffle(pairedCards)
 
   return {
+    id: crypto.randomUUID(),
     cards: shuffledCards,
     flippedCards: [],
     matchedPairs: 0,

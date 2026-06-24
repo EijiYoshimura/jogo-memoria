@@ -18,15 +18,25 @@ type LoadState =
   | { status: 'error'; message: string }
   | { status: 'ready'; config: GameConfig }
 
-function isValidConfig(value: unknown): value is GameConfig {
-  if (!value || typeof value !== 'object') return false
-  const v = value as Record<string, unknown>
-  return (
-    typeof v['event'] === 'object' &&
-    typeof v['game'] === 'object' &&
-    typeof v['leadForm'] === 'object' &&
-    typeof v['adminPin'] === 'string'
-  )
+function isValidConfig(c: unknown): c is GameConfig {
+  if (!c || typeof c !== 'object') return false
+  const cfg = c as Record<string, unknown>
+
+  const event = cfg['event'] as Record<string, unknown> | undefined
+  if (!event || typeof event['id'] !== 'string' || typeof event['name'] !== 'string') return false
+
+  const game = cfg['game'] as Record<string, unknown> | undefined
+  if (!game) return false
+  if (typeof game['pairs'] !== 'number' || (game['pairs'] as number) < 2) return false
+  if (!Array.isArray(game['cardImages']) || (game['cardImages'] as unknown[]).length < (game['pairs'] as number)) return false
+  if (typeof game['timeLimitSeconds'] !== 'number' || (game['timeLimitSeconds'] as number) < 10) return false
+
+  const leadForm = cfg['leadForm'] as Record<string, unknown> | undefined
+  if (!leadForm || !Array.isArray(leadForm['fields'])) return false
+
+  if (typeof cfg['adminPin'] !== 'string' || !/^\d{4,6}$/.test(cfg['adminPin'] as string)) return false
+
+  return true
 }
 
 interface ConfigProviderProps {

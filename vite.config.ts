@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import federation from '@originjs/vite-plugin-federation'
@@ -19,5 +19,9 @@ export default defineConfig({
   build: {
     target: 'esnext',
     minify: false,
+  },
+  test: {
+    environment: 'jsdom',
+    globals: true,
   },
 })

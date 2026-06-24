@@ -48,8 +48,8 @@ export function MemoryGame({ config, onComplete }: MemoryGameProps) {
     [session, isLocked, startTime, onComplete]
   )
 
-  const handleTick = useCallback(() => {
-    setSession((prev) => ({ ...prev, timeRemaining: prev.timeRemaining - 1 }))
+  const handleTick = useCallback((remaining: number) => {
+    setSession((prev) => ({ ...prev, timeRemaining: remaining }))
   }, [])
 
   const handleTimeout = useCallback(() => {
@@ -68,10 +68,10 @@ export function MemoryGame({ config, onComplete }: MemoryGameProps) {
           Pares: {session.matchedPairs} / {session.totalPairs}
         </div>
         <Timer
+          status={session.status}
           timeRemaining={session.timeRemaining}
           onTick={handleTick}
           onTimeout={handleTimeout}
-          isRunning={session.status === 'playing'}
         />
       </div>
       <div className="flex-1 min-h-0">
