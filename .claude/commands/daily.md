@@ -47,3 +47,63 @@ Dias restantes na sprint: N
 ### Etapa 5 — Ações necessárias
 
 Se houver bloqueios, pergunte ao usuário como deseja proceder e acione o agente adequado para resolver.
+
+### Etapa 6 — Salvar os arquivos
+
+Gere **ambos** os arquivos no repositório e commite ao final.
+
+**`docs/ceremonies/sprint-{n}/daily-YYYY-MM-DD.md`:**
+
+```markdown
+# Daily Standup — YYYY-MM-DD
+
+## Resumo do time
+
+| Agente | O que fez ontem | O que fará hoje | Impedimentos |
+|--------|----------------|-----------------|--------------|
+| dev-back | ... | ... | Nenhum |
+| dev-front | ... | ... | ... |
+| qa | ... | ... | ... |
+
+## Issues movidas hoje
+
+| Issue | De | Para |
+|-------|----|------|
+| LIN-XX | In Progress | In Review |
+
+## Impedimentos ativos
+- (lista ou "Nenhum")
+```
+
+**`docs/reports/daily/YYYY-MM-DD.md`:**
+
+```markdown
+# Relatório Diário — YYYY-MM-DD
+
+## Progresso da Sprint {n}
+
+### Issues concluídas hoje
+- [ ] LIN-XX — Título (N pts)
+
+### Issues em andamento
+- LIN-XX — Título | responsável: agente | % estimado: XX%
+
+### Issues bloqueadas
+- LIN-XX — Título | motivo: ...
+
+## Métricas do ciclo
+
+| Métrica | Valor |
+|---------|-------|
+| Pontos entregues (sprint) | X / Y |
+| Velocity do dia | X pts |
+| Issues Done | X |
+| Issues In Progress | X |
+| Issues Todo | X |
+
+## Decisões tomadas hoje
+- (lista de decisões relevantes ou "Nenhuma")
+
+## Próximos passos
+- (lista das principais ações previstas para amanhã)
+```

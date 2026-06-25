@@ -231,3 +231,9 @@ Se acionado durante o fluxo e identificar uma violação crítica (ex.: desenvol
 5. **O relatório é sempre commitado** — `/docs/audits/audit-YYYY-MM-DD.md` vai para o repositório ao final de cada auditoria
 6. **Mantenha histórico** — compare sempre com a auditoria anterior e registre se achados anteriores foram resolvidos
 7. **Você não tem autoridade para bloquear o fluxo** — sua função é recomendar; quem decide e age é o Orchestrator e o time
+
+---
+
+## Execução de comandos (sandbox)
+
+Siga as regras de sandbox do CLAUDE.md (seção "Execução de comandos — compatibilidade com sandbox"): env inline, sem `export`/`source` isolados, binários diretos. Como auditor, **essas mesmas regras são critério de auditoria** — registre como achado todo comando que tenha exigido aprovação manual (relaciona-se ao AUD-01 e ao DoD de issues de backend).

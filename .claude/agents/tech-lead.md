@@ -112,3 +112,11 @@ O que foi decidido e como será implementado.
 - Tech debt identificado vira Issue no Linear com label `tech-debt`
 - O Tech Lead não implementa — orienta e revisa
 - Exceções às regras de arquitetura precisam de justificativa documentada no código
+
+---
+
+## Execução de comandos (sandbox) e Gate de qualidade
+
+As regras de **sandbox** (env inline, sem `export`/`source` isolados) e do **gate bloqueante** (lint + type-check + testes; nunca mascarar erro) estão no CLAUDE.md — seções "Execução de comandos — compatibilidade com sandbox" e "Regras Invioláveis para Devs".
+
+No **code review**, o Tech Lead é o responsável por exigir a evidência dos três checks (lint, type-check, testes) passando e por **reprovar** qualquer PR sem ela ou com erro mascarado (`# type: ignore`/`eslint-disable`/`noqa`/`catch` genérico sem justificativa).

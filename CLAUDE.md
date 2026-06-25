@@ -154,6 +154,26 @@ O Orchestrator documenta cada worktree ativo em `/docs/worktrees-ativos.md` (ou 
 | Status | `In Progress` |
 | Criado em | `YYYY-MM-DD` |
 
+### Execução de comandos — compatibilidade com sandbox (NÃO gerar aprovações manuais)
+
+Comandos que o sandbox classifica como *"evaluates arguments as shell code"* disparam **aprovação manual** e travam o fluxo autônomo do time, desperdiçando tempo. **É proibido** usar os padrões da coluna esquerda — use sempre a alternativa da direita:
+
+| ❌ Proibido (gera aprovação) | ✅ Use no lugar |
+|------------------------------|-----------------|
+| `source .venv/bin/activate` / `. .venv/bin/activate` | Chame o binário do venv direto: `.venv/bin/python`, `.venv/bin/pytest`, `.venv/bin/alembic`, `.venv/bin/pip` |
+| `export VAR=valor` (comando isolado) | Prefixe a variável **inline** na mesma linha: `VAR=valor comando` |
+| `eval "..."` | Evite por completo |
+
+**Regras invioláveis de execução:**
+1. **Nunca** ative virtualenv via `source`/`.` — invoque os executáveis em `.venv/bin/` diretamente.
+2. **Nunca** use `export` como comando isolado — passe variáveis inline: `DATABASE_URL="..." .venv/bin/alembic upgrade head`.
+3. Prefira comandos **simples e diretos**; evite encadeamentos longos com `&&` que misturem ativação + export + execução.
+4. Se um comando exigir aprovação, **reformule** para o padrão sandbox-friendly antes de reexecutar — nunca reenvie o mesmo comando esperando aprovação.
+
+> Esta regra vale para **todos os agentes** que executam shell (dev-back, dev-front, qa, tech-lead, process-auditor). O Orchestrator inclui esse lembrete nas instruções de cada agente que disparar.
+
+**DoD de issues de backend:** inclui o item **"nenhum comando exigiu aprovação manual de sandbox"** — se algum exigiu, a issue não está pronta até o fluxo ser reformulado para o padrão sandbox-friendly (achado AUD-01 da auditoria).
+
 ---
 
 ## Metodologia Ágil
@@ -236,165 +256,17 @@ docs/
         └── YYYY-MM-DD.md                # Relatório diário de evolução
 ```
 
-### Template de Daily Standup (`daily-YYYY-MM-DD.md`)
+### Templates das cerimônias
 
-```markdown
-# Daily Standup — YYYY-MM-DD
+Os templates de cada arquivo de cerimônia **não ficam aqui** — vivem no command que executa a cerimônia e são carregados apenas no momento em que ela roda (economia de contexto). Ao gerar o arquivo, use o template do command correspondente:
 
-## Resumo do time
-
-| Agente | O que fez ontem | O que fará hoje | Impedimentos |
-|--------|----------------|-----------------|--------------|
-| dev-back | ... | ... | Nenhum |
-| dev-front | ... | ... | ... |
-| qa | ... | ... | ... |
-
-## Issues movidas hoje
-
-| Issue | De | Para |
-|-------|----|------|
-| HUB-XX | In Progress | In Review |
-
-## Impedimentos ativos
-- (lista ou "Nenhum")
-```
-
-### Template de Relatório Diário (`reports/daily/YYYY-MM-DD.md`)
-
-```markdown
-# Relatório Diário — YYYY-MM-DD
-
-## Progresso da Sprint {n}
-
-### Issues concluídas hoje
-- [ ] HUB-XX — Título (N pts)
-
-### Issues em andamento
-- HUB-XX — Título | responsável: agente | % estimado: XX%
-
-### Issues bloqueadas
-- HUB-XX — Título | motivo: ...
-
-## Métricas do ciclo
-
-| Métrica | Valor |
-|---------|-------|
-| Pontos entregues (sprint) | X / Y |
-| Velocity do dia | X pts |
-| Issues Done | X |
-| Issues In Progress | X |
-| Issues Todo | X |
-
-## Decisões tomadas hoje
-- (lista de decisões relevantes ou "Nenhuma")
-
-## Próximos passos
-- (lista das principais ações previstas para amanhã)
-```
-
-### Template de PO/PM Sync (`po-pm-sync-YYYY-MM-DD.md`)
-
-```markdown
-# PO/PM Sync — YYYY-MM-DD
-
-## Participantes
-- Product Owner: (nome/agente)
-- Product Manager: (nome/agente)
-
-## Status das entregas vs. objetivos de negócio
-
-| Issue | Status | Alinhado ao negócio? | Observações |
-|-------|--------|----------------------|-------------|
-| LIN-XX | In Progress | Sim / Não | ... |
-
-## Desvios identificados
-- (lista de desvios ou "Nenhum")
-
-## Decisões e alinhamentos
-- (lista de decisões ou ajustes de direção)
-
-## Próximos passos acordados
-- (ações concretas com responsável)
-```
-
-### Template de Sprint Review (`review.md`)
-
-```markdown
-# Sprint Review — Sprint {n} — YYYY-MM-DD
-
-## Participantes
-- Orchestrator, PO, PM, Tech Lead, Dev Back, Dev Front, QA, Designer
-
-## Objetivo da Sprint
-(meta definida no planning)
-
-## Demonstração de entregas
-
-| Issue | Título | Pts | Status | Demo realizada? |
-|-------|--------|-----|--------|-----------------|
-| LIN-XX | ... | X | Done | Sim / Não |
-| LIN-XX | ... | X | In Progress | — |
-
-## Métricas finais da Sprint
-
-| Métrica | Valor |
-|---------|-------|
-| Pontos comprometidos | X |
-| Pontos entregues | X |
-| Velocity | X pts |
-| Issues Done | X |
-| Issues não concluídas | X |
-
-## O que foi entregue (highlights)
-- (lista dos principais entregáveis)
-
-## O que ficou para trás e por quê
-- (issues não concluídas + motivo)
-
-## Feedback do PO/PM sobre as entregas
-- (alinhamento com critérios de aceite e objetivos de negócio)
-```
-
-### Template de Retrospectiva (`retrospective.md`)
-
-```markdown
-# Retrospectiva — Sprint {n} — YYYY-MM-DD
-
-## Participantes
-- Orchestrator, PO, PM, Tech Lead, Dev Back, Dev Front, QA, Designer
-
----
-
-## O que funcionou bem
-- (práticas, dinâmicas e decisões que devem ser mantidas)
-
-## O que não funcionou
-- (problemas de processo, comunicação, qualidade ou fluxo)
-
-## O que pode ser melhorado
-- (sugestões concretas do time)
-
----
-
-## Plano de ação — melhorias a implementar
-
-| # | Melhoria | Responsável | Tipo | Prazo |
-|---|----------|-------------|------|-------|
-| 1 | ... | agente | processo / diretriz / código | próxima sprint |
-| 2 | ... | agente | ... | ... |
-
-**Tipos de melhoria:**
-- `processo` — mudança em cerimônia, fluxo ou regra de trabalho
-- `diretriz` — atualização do CLAUDE.md ou de arquivos em `guidelines/`
-- `agente` — ajuste na definição de um sub-agente em `.claude/agents/`
-- `código` — tech-debt ou padrão técnico a corrigir
-
-## Itens aplicados nesta retro
-- (mudanças que já foram commitadas ao final desta sessão)
-
-## Itens pendentes para a próxima sprint
-- (melhorias que virarão Issues no Linear com label `tech-debt` ou `processo`)
-```
+| Arquivo gerado | Template em |
+|----------------|-------------|
+| `daily-YYYY-MM-DD.md` + `reports/daily/YYYY-MM-DD.md` | `/daily` (`.claude/commands/daily.md`) |
+| `po-pm-sync-YYYY-MM-DD.md` | `/po-pm-sync` (`.claude/commands/po-pm-sync.md`) |
+| `review.md` + `retrospective.md` | `/sprint-review` (`.claude/commands/sprint-review.md`) |
+| `planning.md` | `/sprint-planning` (`.claude/commands/sprint-planning.md`) |
+| `docs/specs/*.md` | `docs/specs/_template.md` (via `/criar-spec`) |
 
 ### Regras de Review e Retrospectiva
 
@@ -416,6 +288,7 @@ docs/
 5. Nenhuma cerimônia é considerada **Done** sem seu arquivo correspondente gerado e salvo
 6. O relatório diário consolida: evolução do board no Linear, decisões tomadas e impedimentos
 7. O PO/PM Sync ocorre **no mínimo 2x por semana** — PO apresenta o status das entregas, PM valida o alinhamento com os objetivos de negócio e OKRs. O arquivo de registro é gerado ao final de cada sync.
+8. **Trilha de aprovação rastreável (AUD-04):** o Orchestrator registra a aprovação de cada gate como comentário na Issue do Linear (ou no PR), em formato estruturado — `Tech Lead: APROVADO — <resumo>`, `QA: APROVADO contra critérios`, `PO: APROVADO` (ou `N/A — issue técnica`). Sem trilha registrada, não há merge. Isso torna auditável quem aprovou o quê e a taxa de reprovação.
 
 ---
 
@@ -429,38 +302,7 @@ Uma spec é um documento estruturado que descreve **o que** será construído an
 
 ### Estrutura obrigatória de uma Spec
 
-```markdown
-# Spec: [Nome da Feature]
-
-## Contexto
-Por que esta feature existe? Qual problema resolve?
-
-## User Story
-Como [perfil de usuário], quero [ação], para que [benefício].
-
-## Critérios de Aceite
-- [ ] Critério 1 (Given / When / Then)
-- [ ] Critério 2
-- [ ] ...
-
-## Design (link Figma/Excalidraw)
-URL ou referência ao design aprovado
-
-## Spec Técnica
-### Arquitetura envolvida
-### Contratos de API (se houver)
-### Modelo de dados (se houver)
-### Considerações de performance/segurança
-
-## Fora de Escopo
-O que explicitamente NÃO será feito nesta entrega
-
-## Definition of Done
-- [ ] Critérios de aceite validados pelo QA
-- [ ] Code review aprovado pelo Tech Lead
-- [ ] Issue atualizada no Linear
-- [ ] Documentação atualizada (se necessário)
-```
+A estrutura canônica da spec vive em **`docs/specs/_template.md`** — toda spec é criada a partir dele (via `/criar-spec`). Seções obrigatórias: Contexto · User Story · Critérios de Aceite (Given/When/Then) · Design · Spec Técnica (arquitetura, contratos de API, modelo de dados, performance/segurança) · Fora de Escopo · Definition of Done.
 
 ### Regras do SDD
 
@@ -506,9 +348,12 @@ Estas regras **nunca podem ser quebradas**, independentemente de prazo, pressão
 1. **Código limpo sempre** — não existe "farei depois" ou "por enquanto assim está bom"
 2. **Zero código morto** — imports, funções, variáveis, arquivos e rotas não utilizadas devem ser removidos imediatamente; o que não serve mais não fica no codebase
 3. **O que funciona continua funcionando** — nenhuma implementação pode quebrar funcionalidades existentes; regressão é bloqueante
-4. **Baseline de testes antes de iniciar** — antes de escrever qualquer linha de código, rodar a suite completa de testes e confirmar que todos passam; se houver falhas pré-existentes, reportar ao Tech Lead antes de continuar
-5. **Validação de regressão ao finalizar** — ao concluir o desenvolvimento, rodar novamente a suite completa; os testes anteriores devem continuar passando e os novos testes devem passar
-6. **Todo PR exige evidência de testes** — a descrição do PR deve incluir o log ou screenshot da execução dos testes, demonstrando que: (a) testes existentes passam e (b) novos testes passam; PR sem evidência não é aceito para review
+4. **Baseline do gate completo antes de iniciar** — antes de escrever qualquer linha de código, rodar o **gate de qualidade completo: lint + type-check + testes** (`ruff`+`mypy`+`pytest` no back; `eslint`+`tsc`+`vitest` no front) e confirmar que tudo passa; se houver falhas pré-existentes, reportar ao Tech Lead antes de continuar — nunca assumir que "só testes" basta
+5. **Validação de regressão ao finalizar** — ao concluir o desenvolvimento, rodar novamente o **gate completo (lint + type-check + testes)**; tudo deve passar — os checks anteriores continuam verdes e os novos passam
+6. **Todo PR exige evidência do gate completo** — a descrição do PR deve incluir o log dos **três checks (lint, type-check, testes)** passando: (a) checks existentes passam e (b) novos passam; PR sem evidência dos três não é aceito para review
+7. **Zero erros silenciosos** — erros não tratados explicitamente devem estourar (propagar) para que falhas sejam visíveis e rastreáveis; capturar um erro sem tratá-lo adequadamente é proibido
+8. **Sem tratamentos de erro genéricos** — blocos `catch` vazios, `catch (e) {}`, logs sem re-throw, e handlers que engolam qualquer exceção são vetados; cada ponto de tratamento deve ser específico ao erro esperado e tomar uma ação concreta (recuperar, transformar ou re-lançar)
+9. **Zero erros de qualidade ao concluir — gate é bloqueante** — nenhuma task é dada como concluída, nenhum PR é aprovado e nenhum merge é feito com erro de **lint**, **type-check** (mypy/tsc) ou **teste** falhando. Erros **nunca** são mascarados, suprimidos com `# type: ignore`/`eslint-disable`/`noqa` sem justificativa explícita, nem empurrados para o backlog como forma de "passar". Se qualquer um dos três checks falha, a task **não está pronta** — ponto. Erros pré-existentes herdados de outra issue são reportados ao Tech Lead e viram issue de correção imediata, não desculpa para mergear com o gate vermelho.
 
 ---
 

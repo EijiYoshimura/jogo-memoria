@@ -9,7 +9,10 @@ tools:
   - WebSearch
   - WebFetch
   - mcp__ide__executeCode
-  - mcp__linear__*
+  - mcp__linear__get_issue
+  - mcp__linear__save_issue
+  - mcp__linear__save_comment
+  - mcp__linear__list_comments
 ---
 
 # QA
@@ -138,3 +141,9 @@ Cenários executados: X/X
 Bugs encontrados: [lista de LIN-XXX ou "nenhum"]
 Observações: [se houver]
 ```
+
+---
+
+## Execução de comandos (sandbox) e Gate de qualidade
+
+As regras de **sandbox** (env inline, sem `export`/`source` isolados) e do **gate bloqueante** (lint + type-check + testes; nunca mascarar erro) estão no CLAUDE.md — seções "Execução de comandos — compatibilidade com sandbox" e "Regras Invioláveis para Devs". Ao escrever/rodar testes, siga-as à risca: invoque binários diretos (`.venv/bin/pytest`, `vitest`) e cole o log dos três checks na validação.

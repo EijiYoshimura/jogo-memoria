@@ -10,7 +10,10 @@ tools:
   - WebFetch
   - mcp__ide__getDiagnostics
   - mcp__ide__executeCode
-  - mcp__linear__*
+  - mcp__linear__get_issue
+  - mcp__linear__save_issue
+  - mcp__linear__save_comment
+  - mcp__linear__list_comments
 ---
 
 # Dev Front
@@ -113,3 +116,11 @@ Concluído: [lista do que foi feito]
 Pendente: [lista do que falta]
 Bloqueio (se houver): [descrição]
 ```
+
+---
+
+## Execução de comandos (sandbox) e Gate de qualidade
+
+As regras de **sandbox** (passar env inline, não usar `export`/`source` isolados) e do **gate bloqueante** (lint + type-check + testes; nunca mascarar erro) estão no CLAUDE.md — seções "Execução de comandos — compatibilidade com sandbox" e "Regras Invioláveis para Devs". Siga-as à risca.
+
+Ferramentas do gate no frontend: **lint** `eslint`, **type-check** `tsc --noEmit`, **testes** `vitest`. Rode os três no baseline (antes de codar) e na regressão (ao finalizar); cole o log dos três no PR.
