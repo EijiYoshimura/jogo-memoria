@@ -20,14 +20,16 @@
 
 ```sql
 CREATE TABLE leads (
-  id           uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
-  event_id     text        NOT NULL,
-  data         jsonb       NOT NULL,
-  score        integer,
-  time_taken   integer,
-  played_at    timestamptz DEFAULT now(),
-  synced_from  text        DEFAULT 'online',
-  created_at   timestamptz DEFAULT now()
+  id               uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
+  event_id         text        NOT NULL,
+  data             jsonb       NOT NULL,
+  score            integer,
+  time_taken       integer,
+  played_at        timestamptz DEFAULT now(),
+  synced_from      text        DEFAULT 'online',
+  created_at       timestamptz DEFAULT now(),
+  consented_at     timestamptz,
+  consent_version  text
 );
 
 -- Habilitar Row Level Security
@@ -49,13 +51,19 @@ CREATE POLICY "anon select"
   USING (true);
 ```
 
-> **Se a tabela já existir** e você só precisar adicionar a política SELECT, execute apenas:
+> **Se a tabela já existir** e você só precisar adicionar a política SELECT ou as colunas de LGPD, execute:
 > ```sql
+> -- Adicionar política SELECT (se ainda não existir)
 > CREATE POLICY "anon select"
 >   ON leads
 >   FOR SELECT
 >   TO anon
 >   USING (true);
+>
+> -- Migração para LGPD (execute se a tabela já existir)
+> ALTER TABLE leads
+>   ADD COLUMN IF NOT EXISTS consented_at   timestamptz,
+>   ADD COLUMN IF NOT EXISTS consent_version text;
 > ```
 
 - [ ] **Copiar as credenciais** em Project Settings → API:

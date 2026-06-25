@@ -12,6 +12,8 @@ export interface LocalLead {
   timeTaken: number
   playedAt: string
   synced: boolean
+  consentedAt: string
+  consentVersion: string
 }
 
 async function getDb() {

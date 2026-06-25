@@ -44,5 +44,12 @@
       }
     ]
   },
-  "adminPin": "1234"
+  "adminPin": "1234",
+  "lgpd": {
+    "consentVersion": "1.0",
+    "dataController": "Evento Demo Ltda",
+    "purposeText": "para que possamos entrar em contato com novidades e promoções",
+    "retentionMonths": 12,
+    "privacyPolicyUrl": ""
+  }
 }

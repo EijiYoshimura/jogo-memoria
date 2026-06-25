@@ -10,6 +10,8 @@ interface SaveLeadParams {
   formData: Record<string, string>
   score: number
   timeTaken: number
+  consentedAt: string
+  consentVersion: string
 }
 
 export function useLeadPersistence() {
@@ -22,7 +24,14 @@ export function useLeadPersistence() {
     }
   }, [])
 
-  async function saveLead({ eventId, formData, score, timeTaken }: SaveLeadParams): Promise<void> {
+  async function saveLead({
+    eventId,
+    formData,
+    score,
+    timeTaken,
+    consentedAt,
+    consentVersion,
+  }: SaveLeadParams): Promise<void> {
     const playedAt = new Date().toISOString()
 
     const localId = await saveLeadToDb({
@@ -32,6 +41,8 @@ export function useLeadPersistence() {
       timeTaken,
       playedAt,
       synced: false,
+      consentedAt,
+      consentVersion,
     })
 
     const success = await syncOnlineLead({
@@ -40,6 +51,8 @@ export function useLeadPersistence() {
       score,
       timeTaken,
       playedAt,
+      consentedAt,
+      consentVersion,
     })
 
     if (success) {
