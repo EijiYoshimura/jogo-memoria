@@ -39,5 +39,12 @@ export interface GameConfig {
     purposeText: string
     retentionMonths: number
     privacyPolicyUrl?: string
+    /**
+     * Texto jurídico completo do consentimento. Quando presente e não-vazio,
+     * substitui os parágrafos templados (autorização + retenção). Texto puro;
+     * quebras de linha (`\n`) são preservadas na renderização. Ao alterar este
+     * texto, incremente `consentVersion`.
+     */
+    consentText?: string
   }
 }

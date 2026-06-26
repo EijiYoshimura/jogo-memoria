@@ -17,6 +17,8 @@ export function ConsentScreen({ config, onAccept, onDecline }: ConsentScreenProp
   const purposeText = lgpd?.purposeText ?? DEFAULT_PURPOSE_TEXT
   const retentionMonths = lgpd?.retentionMonths ?? DEFAULT_RETENTION_MONTHS
   const privacyPolicyUrl = lgpd?.privacyPolicyUrl
+  const customConsentText = lgpd?.consentText?.trim()
+  const hasCustomConsentText = Boolean(customConsentText)
 
   const buttonBaseStyle: React.CSSProperties = {
     minHeight: '64px',
@@ -57,16 +59,22 @@ export function ConsentScreen({ config, onAccept, onDecline }: ConsentScreenProp
 
         <div className="bg-white bg-opacity-10 rounded-xl p-6 text-white text-sm leading-relaxed space-y-3">
           <p className="font-semibold text-base">Antes de jogar, precisamos do seu consentimento.</p>
-          <p>
-            Ao clicar em <strong>Participar e aceitar</strong>, você autoriza{' '}
-            <strong>{dataController}</strong> a coletar e tratar seus dados pessoais{' '}
-            {purposeText}, de acordo com a LGPD (Lei n.&ordm; 13.709/2018).
-          </p>
-          <p>
-            Seus dados serão armazenados por até{' '}
-            <strong>{retentionMonths} {retentionMonths === 1 ? 'mês' : 'meses'}</strong> e poderão ser
-            excluídos a qualquer momento mediante solicitação.
-          </p>
+          {hasCustomConsentText ? (
+            <p style={{ whiteSpace: 'pre-line' }}>{customConsentText}</p>
+          ) : (
+            <>
+              <p>
+                Ao clicar em <strong>Participar e aceitar</strong>, você autoriza{' '}
+                <strong>{dataController}</strong> a coletar e tratar seus dados pessoais{' '}
+                {purposeText}, de acordo com a LGPD (Lei n.&ordm; 13.709/2018).
+              </p>
+              <p>
+                Seus dados serão armazenados por até{' '}
+                <strong>{retentionMonths} {retentionMonths === 1 ? 'mês' : 'meses'}</strong> e poderão ser
+                excluídos a qualquer momento mediante solicitação.
+              </p>
+            </>
+          )}
           {privacyPolicyUrl && (
             <p>
               <a

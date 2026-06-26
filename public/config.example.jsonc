@@ -91,6 +91,12 @@
     "dataController": "Evento Demo Ltda",  // Controlador dos dados (empresa responsável) — nome real
     "purposeText": "para que possamos entrar em contato com novidades e promoções", // Finalidade do uso dos dados
     "retentionMonths": 12,                 // Período de retenção dos dados, em meses
-    "privacyPolicyUrl": ""                 // (OPCIONAL) URL da política de privacidade completa. Vazio = sem link.
+    "privacyPolicyUrl": "",                // (OPCIONAL) URL da política de privacidade completa. Vazio = sem link.
+    // (OPCIONAL) Texto jurídico COMPLETO do consentimento. Quando presente e não-vazio,
+    // SUBSTITUI os parágrafos padrão (montados de dataController/purposeText/retentionMonths).
+    // Texto puro (sem HTML/Markdown); use "\n" para quebras de linha (preservadas na tela).
+    // IMPORTANTE: ao alterar este texto, INCREMENTE "consentVersion" — a versão é gravada
+    // junto do lead para auditoria de qual texto o usuário aceitou.
+    "consentText": ""                      // Ex.: "Eu autorizo o tratamento dos meus dados...\nPosso revogar a qualquer momento."
   }
 }

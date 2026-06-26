@@ -171,4 +171,147 @@ describe('ConsentScreen', () => {
   it('DEFAULT_CONSENT_VERSION é "default"', () => {
     expect(DEFAULT_CONSENT_VERSION).toBe('default')
   })
+
+  describe('consentText customizado (HUB-60)', () => {
+    const customText =
+      'Eu autorizo o tratamento dos meus dados pessoais.\nPosso revogar a qualquer momento.'
+
+    it('renderiza o texto custom e NÃO os parágrafos templados quando consentText presente', () => {
+      const config: GameConfig = {
+        ...baseConfig,
+        lgpd: {
+          consentVersion: '2.0',
+          dataController: 'Empresa LGPD Ltda',
+          purposeText: 'para fins de marketing',
+          retentionMonths: 6,
+          consentText: customText,
+        },
+      }
+      render(
+        <ConsentScreen config={config} onAccept={vi.fn()} onDecline={vi.fn()} />
+      )
+      expect(
+        screen.getByText(/Eu autorizo o tratamento dos meus dados pessoais/),
+      ).toBeDefined()
+      // parágrafos templados não aparecem
+      expect(screen.queryByText(/você autoriza/i)).toBeNull()
+      expect(screen.queryByText(/Seus dados serão armazenados/i)).toBeNull()
+      // cabeçalho e botões preservados (AC4)
+      expect(screen.getByText(/Antes de jogar/i)).toBeDefined()
+      expect(
+        screen.getByRole('button', { name: /Participar e aceitar/i }),
+      ).toBeDefined()
+      expect(
+        screen.getByRole('button', { name: /Jogar sem participar/i }),
+      ).toBeDefined()
+    })
+
+    it('aplica white-space: pre-line para preservar quebras de linha', () => {
+      const config: GameConfig = {
+        ...baseConfig,
+        lgpd: {
+          consentVersion: '2.0',
+          dataController: 'Empresa',
+          purposeText: 'para contato',
+          retentionMonths: 12,
+          consentText: customText,
+        },
+      }
+      render(
+        <ConsentScreen config={config} onAccept={vi.fn()} onDecline={vi.fn()} />
+      )
+      const paragraph = screen.getByText(/Eu autorizo o tratamento/)
+      expect(paragraph.getAttribute('style')).toContain('pre-line')
+    })
+
+    it('não injeta HTML — markup no consentText é renderizado como texto puro (AC3)', () => {
+      const config: GameConfig = {
+        ...baseConfig,
+        lgpd: {
+          consentVersion: '2.0',
+          dataController: 'Empresa',
+          purposeText: 'para contato',
+          retentionMonths: 12,
+          consentText: 'Aceito <b>tudo</b> conforme a LGPD.',
+        },
+      }
+      const { container } = render(
+        <ConsentScreen config={config} onAccept={vi.fn()} onDecline={vi.fn()} />
+      )
+      // a tag <b> não vira elemento real — fica como texto escapado
+      expect(container.querySelector('b')).toBeNull()
+      expect(screen.getByText(/Aceito <b>tudo<\/b> conforme a LGPD\./)).toBeDefined()
+    })
+
+    it('mantém parágrafos templados quando consentText ausente (retrocompat AC5)', () => {
+      const config: GameConfig = {
+        ...baseConfig,
+        lgpd: {
+          consentVersion: '1.0',
+          dataController: 'Empresa LGPD Ltda',
+          purposeText: 'para fins de marketing',
+          retentionMonths: 6,
+        },
+      }
+      render(
+        <ConsentScreen config={config} onAccept={vi.fn()} onDecline={vi.fn()} />
+      )
+      expect(screen.getByText(/você autoriza/i)).toBeDefined()
+      expect(screen.getByText(/6 meses/)).toBeDefined()
+    })
+
+    it('trata consentText apenas com espaços como ausente (retrocompat)', () => {
+      const config: GameConfig = {
+        ...baseConfig,
+        lgpd: {
+          consentVersion: '1.0',
+          dataController: 'Empresa',
+          purposeText: 'para contato',
+          retentionMonths: 12,
+          consentText: '   \n  ',
+        },
+      }
+      render(
+        <ConsentScreen config={config} onAccept={vi.fn()} onDecline={vi.fn()} />
+      )
+      expect(screen.getByText(/você autoriza/i)).toBeDefined()
+    })
+
+    it('exibe o link privacyPolicyUrl no modo custom quando presente (AC4)', () => {
+      const config: GameConfig = {
+        ...baseConfig,
+        lgpd: {
+          consentVersion: '2.0',
+          dataController: 'Empresa',
+          purposeText: 'para contato',
+          retentionMonths: 12,
+          privacyPolicyUrl: 'https://empresa.com/privacidade',
+          consentText: customText,
+        },
+      }
+      render(
+        <ConsentScreen config={config} onAccept={vi.fn()} onDecline={vi.fn()} />
+      )
+      const link = screen.getByRole('link', { name: /Política de Privacidade/i })
+      expect(link.getAttribute('href')).toBe('https://empresa.com/privacidade')
+    })
+
+    it('exibe o link privacyPolicyUrl no modo templado quando presente (AC4)', () => {
+      const config: GameConfig = {
+        ...baseConfig,
+        lgpd: {
+          consentVersion: '1.0',
+          dataController: 'Empresa',
+          purposeText: 'para contato',
+          retentionMonths: 12,
+          privacyPolicyUrl: 'https://empresa.com/privacidade',
+        },
+      }
+      render(
+        <ConsentScreen config={config} onAccept={vi.fn()} onDecline={vi.fn()} />
+      )
+      const link = screen.getByRole('link', { name: /Política de Privacidade/i })
+      expect(link.getAttribute('href')).toBe('https://empresa.com/privacidade')
+    })
+  })
 })
