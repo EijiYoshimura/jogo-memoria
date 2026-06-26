@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "clean-architecture": {
+      "source": "wondelai/skills",
+      "sourceType": "github",
+      "skillPath": "clean-architecture/SKILL.md",
+      "computedHash": "7f31c43ed3a43034944886beb1dcc965b4cc8da86e7dcb4fece5975799f10818"
+    },
+    "clean-code": {
+      "source": "wondelai/skills",
+      "sourceType": "github",
+      "skillPath": "clean-code/SKILL.md",
+      "computedHash": "bfadcce7fe81da643c595ebfabadac840ac970e2ac0e8e0d32763ed2414b9cd7"
+    },
+    "domain-driven-design": {
+      "source": "wondelai/skills",
+      "sourceType": "github",
+      "skillPath": "domain-driven-design/SKILL.md",
+      "computedHash": "8c99f2c4f802cdd1855f850d60378a8b697ca3fd2d6749346643da675bfc44a4"
+    }
+  }
+}
