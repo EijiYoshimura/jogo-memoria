@@ -314,4 +314,92 @@ describe('ConsentScreen', () => {
       expect(link.getAttribute('href')).toBe('https://empresa.com/privacidade')
     })
   })
+
+  describe('Política de Privacidade in-app (HUB-62)', () => {
+    const withPath = (overrides: Partial<NonNullable<GameConfig['lgpd']>> = {}): GameConfig => ({
+      ...baseConfig,
+      lgpd: {
+        consentVersion: '1.0',
+        dataController: 'Empresa',
+        purposeText: 'para contato',
+        retentionMonths: 12,
+        privacyPolicyPath: '/privacy-policy.html',
+        ...overrides,
+      },
+    })
+
+    it('AC4: clicar no link abre a tela in-app com iframe (src correto + sandbox sem permissões)', () => {
+      const { container } = render(
+        <ConsentScreen config={withPath()} onAccept={vi.fn()} onDecline={vi.fn()} />
+      )
+      // não é link externo — é um botão que abre a tela interna
+      expect(screen.queryByRole('link', { name: /Política de Privacidade/i })).toBeNull()
+      fireEvent.click(screen.getByRole('button', { name: /Ler Política de Privacidade/i }))
+
+      const iframe = container.querySelector('iframe')
+      expect(iframe).not.toBeNull()
+      expect(iframe?.getAttribute('src')).toBe('/privacy-policy.html')
+      expect(iframe?.getAttribute('title')).toBe('Política de Privacidade')
+      // sandbox presente e SEM permissões (string vazia → máxima restrição, sem allow-scripts)
+      expect(iframe?.getAttribute('sandbox')).toBe('')
+      expect(screen.getByRole('heading', { name: 'Política de Privacidade' })).toBeDefined()
+    })
+
+    it('AC3: não usa dangerouslySetInnerHTML — conteúdo só vem do iframe same-origin', () => {
+      const { container } = render(
+        <ConsentScreen config={withPath()} onAccept={vi.fn()} onDecline={vi.fn()} />
+      )
+      fireEvent.click(screen.getByRole('button', { name: /Ler Política de Privacidade/i }))
+      // a tela in-app não injeta HTML arbitrário; o único portador de conteúdo é o iframe
+      expect(container.querySelector('iframe')).not.toBeNull()
+    })
+
+    it('AC2: botão "← Voltar" retorna à tela de consentimento', () => {
+      const { container } = render(
+        <ConsentScreen config={withPath()} onAccept={vi.fn()} onDecline={vi.fn()} />
+      )
+      fireEvent.click(screen.getByRole('button', { name: /Ler Política de Privacidade/i }))
+      expect(container.querySelector('iframe')).not.toBeNull()
+
+      fireEvent.click(screen.getByRole('button', { name: /Voltar/i }))
+      // de volta ao consentimento: sem iframe, botões de consentimento visíveis
+      expect(container.querySelector('iframe')).toBeNull()
+      expect(screen.getByRole('button', { name: /Participar e aceitar/i })).toBeDefined()
+      expect(screen.getByRole('button', { name: /Ler Política de Privacidade/i })).toBeDefined()
+    })
+
+    it('AC4: privacyPolicyPath tem prioridade sobre privacyPolicyUrl (abre in-app, não nova aba)', () => {
+      const config = withPath({ privacyPolicyUrl: 'https://empresa.com/privacidade' })
+      const { container } = render(
+        <ConsentScreen config={config} onAccept={vi.fn()} onDecline={vi.fn()} />
+      )
+      // sem âncora externa; apenas o botão in-app
+      expect(screen.queryByRole('link')).toBeNull()
+      fireEvent.click(screen.getByRole('button', { name: /Ler Política de Privacidade/i }))
+      expect(container.querySelector('iframe')?.getAttribute('src')).toBe('/privacy-policy.html')
+    })
+
+    it('AC5: só privacyPolicyUrl mantém o link externo target="_blank" (comportamento atual)', () => {
+      const config: GameConfig = {
+        ...baseConfig,
+        lgpd: {
+          consentVersion: '1.0',
+          dataController: 'Empresa',
+          purposeText: 'para contato',
+          retentionMonths: 12,
+          privacyPolicyUrl: 'https://empresa.com/privacidade',
+        },
+      }
+      render(<ConsentScreen config={config} onAccept={vi.fn()} onDecline={vi.fn()} />)
+      const link = screen.getByRole('link', { name: /Política de Privacidade/i })
+      expect(link.getAttribute('href')).toBe('https://empresa.com/privacidade')
+      expect(link.getAttribute('target')).toBe('_blank')
+    })
+
+    it('AC5: sem privacyPolicyPath nem privacyPolicyUrl não há link nem botão de política (retrocompat)', () => {
+      render(<ConsentScreen config={baseConfig} onAccept={vi.fn()} onDecline={vi.fn()} />)
+      expect(screen.queryByRole('link')).toBeNull()
+      expect(screen.queryByRole('button', { name: /Política de Privacidade/i })).toBeNull()
+    })
+  })
 })

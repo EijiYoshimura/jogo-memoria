@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Política de Privacidade</title>
+  <!--
+    ============================================================================
+    TEMPLATE DE POLÍTICA DE PRIVACIDADE — SUBSTITUA O CONTEÚDO PLACEHOLDER ABAIXO
+    ============================================================================
+    Este arquivo é exibido in-app (via <iframe> sandbox) na tela de consentimento
+    quando `lgpd.privacyPolicyPath` aponta para ele (ex.: "/privacy-policy.html").
+
+    O OPERADOR deve:
+      1. Substituir TODO o texto entre os marcadores [SUBSTITUIR: ...] pelo
+         conteúdo jurídico real da política do evento/controlador.
+      2. Revisar com o responsável jurídico/DPO antes de publicar.
+      3. Manter o arquivo em `public/` (servido same-origin pela própria app).
+
+    Layout otimizado para TOTEM RETRATO: fonte ampla, largura máxima de leitura,
+    rolagem vertical e alto contraste. NÃO adicione <script> — o iframe roda com
+    `sandbox` sem permissão de scripts.
+    ============================================================================
+  -->
+  <style>
+    :root {
+      --text: #1a1a1a;
+      --muted: #555555;
+      --accent: #7C3AED;
+      --bg: #ffffff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+      margin: 0;
+      padding: 2rem 1.5rem 4rem;
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 1.25rem;
+      line-height: 1.7;
+    }
+
+    main {
+      max-width: 70ch;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 2.25rem;
+      line-height: 1.2;
+      margin: 0 0 0.5rem;
+    }
+
+    h2 {
+      font-size: 1.6rem;
+      line-height: 1.3;
+      margin: 2.5rem 0 0.75rem;
+      color: var(--accent);
+    }
+
+    p {
+      margin: 0 0 1rem;
+    }
+
+    ul {
+      margin: 0 0 1rem;
+      padding-left: 1.5rem;
+    }
+
+    li {
+      margin-bottom: 0.5rem;
+    }
+
+    .updated {
+      color: var(--muted);
+      font-size: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    a {
+      color: var(--accent);
+      word-break: break-word;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Política de Privacidade</h1>
+    <p class="updated">Última atualização: [SUBSTITUIR: dd/mm/aaaa]</p>
+
+    <p>
+      [SUBSTITUIR: parágrafo de introdução — descreva quem é o controlador dos
+      dados e o propósito geral desta política, em conformidade com a Lei Geral
+      de Proteção de Dados (Lei nº 13.709/2018 — LGPD).]
+    </p>
+
+    <!-- ===================== Seção: Coleta de dados ===================== -->
+    <h2>1. Coleta de dados</h2>
+    <p>
+      [SUBSTITUIR: descreva quais dados pessoais são coletados — por exemplo,
+      nome, e-mail, telefone — e em que momento são coletados (ex.: ao preencher
+      o formulário do jogo).]
+    </p>
+    <ul>
+      <li>[SUBSTITUIR: dado coletado 1]</li>
+      <li>[SUBSTITUIR: dado coletado 2]</li>
+      <li>[SUBSTITUIR: dado coletado 3]</li>
+    </ul>
+
+    <!-- ================== Seção: Uso / Finalidade ====================== -->
+    <h2>2. Uso e finalidade</h2>
+    <p>
+      [SUBSTITUIR: explique para quais finalidades os dados são utilizados — por
+      exemplo, contato sobre novidades do evento, ações de marketing, métricas —
+      e a base legal (consentimento do titular).]
+    </p>
+
+    <!-- ======================= Seção: Retenção ========================= -->
+    <h2>3. Retenção</h2>
+    <p>
+      [SUBSTITUIR: informe por quanto tempo os dados serão armazenados e o que
+      acontece após esse período (ex.: exclusão definitiva). Mantenha coerência
+      com o campo "retentionMonths" da configuração.]
+    </p>
+
+    <!-- ============== Seção: Direitos do titular (LGPD) ================ -->
+    <h2>4. Direitos do titular</h2>
+    <p>
+      [SUBSTITUIR: descreva os direitos garantidos ao titular pela LGPD.]
+      Nos termos da LGPD, o titular pode, a qualquer momento:
+    </p>
+    <ul>
+      <li>Confirmar a existência de tratamento de seus dados;</li>
+      <li>Acessar os dados;</li>
+      <li>Corrigir dados incompletos, inexatos ou desatualizados;</li>
+      <li>Solicitar a anonimização, bloqueio ou eliminação dos dados;</li>
+      <li>Revogar o consentimento.</li>
+    </ul>
+
+    <!-- ============== Seção: Contato do controlador =================== -->
+    <h2>5. Contato do controlador</h2>
+    <p>
+      [SUBSTITUIR: informe o nome do controlador dos dados, o responsável/DPO e
+      um canal de contato (e-mail e/ou telefone) para o exercício dos direitos
+      acima.]
+    </p>
+    <p>
+      Encarregado (DPO): [SUBSTITUIR: nome]<br />
+      E-mail: [SUBSTITUIR: contato@exemplo.com]
+    </p>
+  </main>
+</body>
+</html>
