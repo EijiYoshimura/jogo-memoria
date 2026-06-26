@@ -2,21 +2,21 @@
   "event": {
     "id": "evento-demo-2026",
     "name": "Evento Demo",
-    "logo": "https://placehold.co/300x120/7C3AED/white?text=Evento+Demo",
+    "logo": "/images/logo_bb.png",
     "primaryColor": "#7C3AED",
     "backgroundColor": "#1E1B4B"
   },
   "game": {
     "pairs": 6,
     "cardImages": [
-      "https://picsum.photos/seed/mem1/400/400",
-      "https://picsum.photos/seed/mem2/400/400",
-      "https://picsum.photos/seed/mem3/400/400",
-      "https://picsum.photos/seed/mem4/400/400",
-      "https://picsum.photos/seed/mem5/400/400",
-      "https://picsum.photos/seed/mem6/400/400"
+      "/images/card_01.png",
+      "/images/card_02.png",
+      "/images/card_03.png",
+      "/images/card_04.png",
+      "/images/card_05.png",
+      "/images/card_06.png"
     ],
-    "cardBack": "https://picsum.photos/seed/cardback/400/400",
+    "cardBack": "/images/card_back.png",
     "timeLimitSeconds": 60,
     "autoResetSeconds": 30
   },
@@ -54,6 +54,7 @@
     "dataController": "Evento Demo Ltda",
     "purposeText": "para que possamos entrar em contato com novidades e promoções",
     "retentionMonths": 12,
-    "privacyPolicyUrl": ""
+    "privacyPolicyUrl": "",
+    "consentText": "Eu concordo com a coleta e uso dos meus dados pessoais para fins de marketing, conforme descrito na Política de Privacidade."
   }
 }
