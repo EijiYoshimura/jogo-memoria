@@ -15,12 +15,21 @@ export interface GameConfig {
   }
   leadForm: {
     title: string
+    /**
+     * Teclado virtual on-screen (HUB-57). Opcional e retrocompatível.
+     * Ausente/`enabled: false` (default) ⇒ teclado nativo do SO (comportamento atual).
+     */
+    virtualKeyboard?: {
+      enabled: boolean
+    }
     fields: Array<{
       id: string
       label: string
       type: 'text' | 'email' | 'tel'
       required: boolean
       mask?: string
+      /** Override de layout do teclado virtual por campo; ausência cai no `type`. */
+      keyboardLayout?: string
     }>
   }
   adminPin: string
