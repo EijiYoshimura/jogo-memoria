@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import type { GameConfig } from '../game/types'
+import { PrivacyPolicyScreen } from './PrivacyPolicyScreen'
 
 const DEFAULT_PURPOSE_TEXT = 'para entrar em contato sobre as novidades do evento'
 const DEFAULT_RETENTION_MONTHS = 12
@@ -17,8 +19,11 @@ export function ConsentScreen({ config, onAccept, onDecline }: ConsentScreenProp
   const purposeText = lgpd?.purposeText ?? DEFAULT_PURPOSE_TEXT
   const retentionMonths = lgpd?.retentionMonths ?? DEFAULT_RETENTION_MONTHS
   const privacyPolicyUrl = lgpd?.privacyPolicyUrl
+  const privacyPolicyPath = lgpd?.privacyPolicyPath
   const customConsentText = lgpd?.consentText?.trim()
   const hasCustomConsentText = Boolean(customConsentText)
+
+  const [showPolicy, setShowPolicy] = useState(false)
 
   const buttonBaseStyle: React.CSSProperties = {
     minHeight: '64px',
@@ -41,6 +46,17 @@ export function ConsentScreen({ config, onAccept, onDecline }: ConsentScreenProp
     ...buttonBaseStyle,
     backgroundColor: 'transparent',
     color: event.primaryColor,
+  }
+
+  if (showPolicy && privacyPolicyPath) {
+    return (
+      <PrivacyPolicyScreen
+        privacyPolicyPath={privacyPolicyPath}
+        primaryColor={event.primaryColor}
+        backgroundColor={event.backgroundColor}
+        onBack={() => setShowPolicy(false)}
+      />
+    )
   }
 
   return (
@@ -75,18 +91,31 @@ export function ConsentScreen({ config, onAccept, onDecline }: ConsentScreenProp
               </p>
             </>
           )}
-          {privacyPolicyUrl && (
+          {privacyPolicyPath ? (
             <p>
-              <a
-                href={privacyPolicyUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
+                onClick={() => setShowPolicy(true)}
                 style={{ color: event.primaryColor }}
-                className="underline font-medium"
+                className="underline font-medium bg-transparent border-0 p-0 cursor-pointer"
               >
                 Ler Política de Privacidade
-              </a>
+              </button>
             </p>
+          ) : (
+            privacyPolicyUrl && (
+              <p>
+                <a
+                  href={privacyPolicyUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: event.primaryColor }}
+                  className="underline font-medium"
+                >
+                  Ler Política de Privacidade
+                </a>
+              </p>
+            )
           )}
         </div>
 

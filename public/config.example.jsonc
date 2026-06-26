@@ -91,7 +91,12 @@
     "dataController": "Evento Demo Ltda",  // Controlador dos dados (empresa responsável) — nome real
     "purposeText": "para que possamos entrar em contato com novidades e promoções", // Finalidade do uso dos dados
     "retentionMonths": 12,                 // Período de retenção dos dados, em meses
-    "privacyPolicyUrl": "",                // (OPCIONAL) URL da política de privacidade completa. Vazio = sem link.
+    "privacyPolicyUrl": "",                // (OPCIONAL) URL EXTERNA da política. Abre em NOVA ABA (target=_blank). Vazio = sem link externo.
+    "privacyPolicyPath": "",               // (OPCIONAL) Caminho SAME-ORIGIN para um HTML da política servido de `public/`
+                                           //            (ex.: "/privacy-policy.html"). Quando preenchido, o link "Ler Política de
+                                           //            Privacidade" abre a política IN-APP (iframe sandbox, sem sair do totem) —
+                                           //            ideal para kiosk, onde nova aba costuma ser bloqueada. Tem PRIORIDADE sobre
+                                           //            "privacyPolicyUrl". Edite o conteúdo em `public/privacy-policy.html`.
     // (OPCIONAL) Texto jurídico COMPLETO do consentimento. Quando presente e não-vazio,
     // SUBSTITUI os parágrafos padrão (montados de dataController/purposeText/retentionMonths).
     // Texto puro (sem HTML/Markdown); use "\n" para quebras de linha (preservadas na tela).
