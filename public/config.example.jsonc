@@ -1,0 +1,96 @@
+// =============================================================================
+// config.example.jsonc — TEMPLATE DE REFERÊNCIA (comentado) da configuração do evento
+// =============================================================================
+//
+// ⚠️  Este arquivo .jsonc é APENAS documentação/template. A aplicação NÃO o carrega.
+//     A app lê `public/config.json` (JSON estrito, SEM comentários) via fetch + res.json().
+//
+// COMO USAR:
+//   1. Copie o conteúdo abaixo para `public/config.json`.
+//   2. REMOVA todos os comentários (`//`) — JSON estrito não os aceita.
+//   3. Substitua os valores de exemplo pelos dados reais do evento.
+//
+// Todos os caminhos de imagem podem ser URLs (https://...) ou caminhos relativos
+// servidos junto da app (ex.: "/cards/carta1.png" para um arquivo em public/cards/).
+// =============================================================================
+{
+  // --- Identidade visual / branding do evento -------------------------------
+  "event": {
+    "id": "evento-demo-2026",              // Identificador único do evento (string livre; usado em logs/registro de leads)
+    "name": "Evento Demo",                 // Nome exibido (ex.: na tela de splash)
+    "logo": "https://placehold.co/300x120/7C3AED/white?text=Evento+Demo", // URL/caminho do logo do evento
+    "primaryColor": "#7C3AED",             // Cor primária (botões, destaques, teclas pressionadas) — hex
+    "backgroundColor": "#1E1B4B"           // Cor de fundo das telas — hex
+  },
+
+  // --- Jogo da memória ------------------------------------------------------
+  "game": {
+    "pairs": 6,                            // Nº de PARES de cartas. Deve ser igual ao tamanho de `cardImages`.
+    "cardImages": [                        // Lista de imagens das cartas (uma por par). Tamanho deve casar com `pairs`.
+      "https://picsum.photos/seed/mem1/400/400",
+      "https://picsum.photos/seed/mem2/400/400",
+      "https://picsum.photos/seed/mem3/400/400",
+      "https://picsum.photos/seed/mem4/400/400",
+      "https://picsum.photos/seed/mem5/400/400",
+      "https://picsum.photos/seed/mem6/400/400"
+    ],
+    "cardBack": "https://picsum.photos/seed/cardback/400/400", // Imagem do VERSO das cartas (carta virada para baixo)
+    "timeLimitSeconds": 60,                // Tempo limite da partida, em segundos
+    "autoResetSeconds": 30                 // (OPCIONAL) Segundos na tela de resultado antes de reiniciar para o próximo participante.
+                                           //            Omita para desativar o auto-reset.
+  },
+
+  // --- Formulário de captura de lead ----------------------------------------
+  "leadForm": {
+    "title": "Preencha seus dados para jogar!", // Título exibido no topo do formulário
+
+    // Teclado virtual on-screen (HUB-57). OPCIONAL e retrocompatível.
+    // Use em TOTEM touch sem teclado físico, onde o teclado do SO atrapalha o layout.
+    "virtualKeyboard": {
+      "enabled": false                     // false (default) = teclado NATIVO do SO (comportamento padrão).
+                                           // true = teclado virtual renderizado na própria tela, abaixo do form.
+                                           // ⚠️ Antes de ligar (true) em produção, faça smoke test no totem retrato real
+                                           //    (validar C1: teclado do SO não sobe; C6: posicionamento; C9: toque).
+    },
+
+    // Campos do formulário. A ordem aqui é a ordem de exibição.
+    "fields": [
+      {
+        "id": "name",                      // Identificador do campo (chave no registro do lead) — único
+        "label": "Nome completo",          // Rótulo exibido
+        "type": "text",                    // Tipo: "text" | "email" | "tel" (define validação e layout de teclado)
+        "required": true                   // true = obrigatório para enviar o formulário
+      },
+      {
+        "id": "email",
+        "label": "E-mail",
+        "type": "email",                   // "email" aplica validação de formato de e-mail
+        "required": true
+      },
+      {
+        "id": "phone",
+        "label": "WhatsApp",
+        "type": "tel",                     // "tel" usa teclado numérico
+        "required": false,
+        "mask": "(99) 99999-9999"          // (OPCIONAL) Máscara de telefone. "9" = dígito. Aplicada progressivamente.
+        // "keyboardLayout": "numeric"     // (OPCIONAL) Override do layout do teclado virtual deste campo.
+                                           //            Ausente = layout escolhido pelo `type` (text→alfabético, email→email, tel→numérico).
+                                           //            Útil para campos futuros (ex.: CPF) que precisem de um layout específico.
+      }
+    ]
+  },
+
+  // --- Painel administrativo (export de leads) ------------------------------
+  "adminPin": "1234",                      // PIN de acesso ao painel admin (export CSV). TROQUE por um valor real e secreto.
+
+  // --- LGPD: consentimento e retenção ---------------------------------------
+  // OPCIONAL, mas FORTEMENTE recomendado para captação de dados em evento no Brasil.
+  // Se presente, exibe a tela de consentimento informado antes da captura do lead.
+  "lgpd": {
+    "consentVersion": "1.0",               // Versão do texto de consentimento (gravada junto do lead para auditoria)
+    "dataController": "Evento Demo Ltda",  // Controlador dos dados (empresa responsável) — nome real
+    "purposeText": "para que possamos entrar em contato com novidades e promoções", // Finalidade do uso dos dados
+    "retentionMonths": 12,                 // Período de retenção dos dados, em meses
+    "privacyPolicyUrl": ""                 // (OPCIONAL) URL da política de privacidade completa. Vazio = sem link.
+  }
+}
