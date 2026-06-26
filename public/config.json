@@ -22,6 +22,9 @@
   },
   "leadForm": {
     "title": "Preencha seus dados para jogar!",
+    "virtualKeyboard": {
+      "enabled": true
+    },
     "fields": [
       {
         "id": "name",
@@ -40,7 +43,8 @@
         "label": "WhatsApp",
         "type": "tel",
         "required": false,
-        "mask": "(99) 99999-9999"
+        "mask": "(99) 99999-9999",
+        "keyboardLayout": "numeric"
       }
     ]
   },
