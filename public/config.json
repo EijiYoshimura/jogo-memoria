@@ -17,7 +17,8 @@
       "/images/card_06.png"
     ],
     "cardBack": "/images/card_back.png",
-    "timeLimitSeconds": 999999999999999999999,
+    "timeLimitSeconds": 60,
+    "timerEnabled": false,
     "autoResetSeconds": 30
   },
   "leadForm": {

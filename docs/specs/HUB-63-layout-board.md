@@ -4,12 +4,19 @@
 
 O layout atual do board do jogo da memória (`src/game/index.tsx`, `Board.tsx`, `Card.tsx`)
 está em estado provisório: contém moldura de debug (`border-4 border-blue-500`), fundo
-herdado do config (`#1E1B4B`), cards sem moldura branca e código morto comentado.
+herdado do config (`#1E1B4B`) e cards sem a moldura branca do mockup.
+
+No baseline, o `Timer` e seus handlers (`handleTick`/`handleTimeout`) estavam **vivos no
+código** (não comentados), porém o `<Timer />` não era renderizado e o `timeLimitSeconds`
+usava um número mágico (`999999999999999999999`) para "desligar" o timer na prática. Esta
+entrega substitui esse hack por uma flag explícita e configurável por evento (`game.timerEnabled`),
+mantendo o `Timer.tsx` como componente de primeira classe — dormente por padrão, ligável por config.
 
 O cliente (BB Seguros) forneceu um mockup de referência (`public/images/mockup_board.png`)
 que define a identidade visual final do board. Esta entrega ajusta o layout para reproduzir
-fielmente esse mockup. Trata-se de uma tarefa de **UI/layout puro** — nenhuma regra de jogo
-(flip, match, timer) é alterada.
+fielmente esse mockup. Trata-se de uma tarefa de **UI/layout** — nenhuma regra de jogo
+(flip, match) é alterada; o timer passa a ser ligado/desligado por configuração, sem mudar
+a lógica de contagem existente em `Timer.tsx`.
 
 ## User Story
 
@@ -207,10 +214,12 @@ e o `Board` ocupa `flex-1 min-h-0`. O board é exibido em container retrato (est
 
 | Arquivo | Responsabilidade nesta entrega |
 |---------|--------------------------------|
-| `src/game/index.tsx` | Container `MemoryGame`. Ajustar fundo, header/logo (`object-contain` + `alt` correto), remover `border-4 border-blue-500 rounded-lg` de debug e **remover código morto** (handlers `handleTick`/`handleTimeout`, `setTimeout` no-op da linha 46, import comentado do `Timer`, divs/comentários vazios do header de pares). |
+| `src/game/index.tsx` | Container `MemoryGame`. Ajustar fundo, header/logo (`object-contain` + `alt` correto), remover `border-4 border-blue-500 rounded-lg` de debug, remover o `setTimeout` no-op da branch de match e **renderizar o `<Timer />` condicionalmente** a `config.game.timerEnabled` (handlers `handleTick`/`handleTimeout` ficam referenciados pelo render condicional). |
+| `src/game/components/Timer.tsx` | **Mantido intacto** — componente de primeira classe. Deixa de ser código órfão ao ser renderizado condicionalmente por `timerEnabled`. |
 | `src/game/components/Board.tsx` | Grid. Fixar `grid-cols-3 gap-5 w-full` (remover `h-full`), **remover código morto** (`getGridColumns` comentado, prop `totalPairs` comentada, `const columns`/`gridTemplateColumns` dinâmicos e o `<div>` de teste comentado). Colunas fixas em 3 conforme mockup. |
 | `src/game/components/Card.tsx` | Face do card. Adicionar `aspect-square` na raiz; imagens `w-full h-full object-contain`; trocar `bg-opacity-40` (deprecado no Tailwind v4) por `bg-green-400/40`. **Não** adicionar moldura branca via CSS (já embutida no PNG). |
-| `public/config.json` | `event.backgroundColor`: `#1E1B4B` → `#0333BD` (ver decisão sobre fundo abaixo). |
+| `public/config.json` | `event.backgroundColor`: `#1E1B4B` → `#0333BD`; `game.timeLimitSeconds`: revertido de `999999999999999999999` (número mágico) para `60` (valor real); adiciona `game.timerEnabled: false` (timer dormante por padrão). |
+| `src/game/types.ts` | Adiciona `game.timerEnabled?: boolean` (opcional/retrocompatível). |
 
 ### Contratos de API (se houver)
 
@@ -240,20 +249,31 @@ permanece idêntica.
      a via config). Os Critérios de Aceite (Cenário 1) são agnósticos quanto à origem do valor — ambos os
      caminhos os satisfazem, então não há conflito com os critérios, apenas com a recomendação de Design.
 
-2. **Remoção de código morto comentado (Clean Code — regra inviolável "zero código morto").**
-   `Board.tsx` (`getGridColumns`, `totalPairs`, colunas dinâmicas, `<div>` de teste) e `index.tsx`
-   (Timer import, `handleTick`, `handleTimeout`, `setTimeout(() => {null},1000)`, comentários do header
-   de pares) devem ser **deletados**, não recomentados. Esses trechos são justamente a origem das falhas
-   de baseline (ver Plano de testes) — removê-los zera o gate como consequência natural da issue.
+2. **Timer dormente porém configurável (DECISÃO DO STAKEHOLDER + TECH LEAD).**
+   O Timer **não é deletado**. Em vez do número mágico `999999999999999999999` em `timeLimitSeconds`
+   (que "desligava" o timer de forma implícita e ilegível) e dos handlers órfãos, a entrega:
+   - reverte `timeLimitSeconds` para `60` (valor real usado quando o timer estiver ligado);
+   - adiciona a flag `game.timerEnabled` (default `false`) em `config.json` e em `GameConfig`;
+   - renderiza `<Timer />` e os handlers `handleTick`/`handleTimeout` **apenas** quando
+     `config.game.timerEnabled === true`.
+   Com o evento atual (`timerEnabled: false`) o Timer fica dormente: não renderiza e não há derrota
+   por tempo — o layout segue fiel ao mockup (logo no topo, sem timer/contador). Para um evento futuro
+   que queira tempo limite, basta `timerEnabled: true` no config — sem mudança de código. Isso elimina
+   tanto o número mágico quanto o "componente órfão", mantendo `Timer.tsx` como código vivo e testável.
 
-3. **`aspect-square` no card (em vez de `h-full` no grid).** O quadrado 1:1 passa a ser garantido por
+3. **Remoção do `setTimeout` no-op (Clean Code — "zero código morto").**
+   `Board.tsx` (`getGridColumns`, `totalPairs`, colunas dinâmicas, `<div>` de teste) e o
+   `setTimeout(() => {null}, 1000)` na branch de match em `index.tsx` são **deletados**, não
+   recomentados — não têm efeito e poluíam a leitura.
+
+4. **`aspect-square` no card (em vez de `h-full` no grid).** O quadrado 1:1 passa a ser garantido por
    `aspect-square` na raiz do `Card`, não pelo esticamento vertical do grid. Remove a deformação atual e
    torna o card auto-suficiente quanto à proporção, independentemente da altura do container.
 
-4. **Tailwind v4 — utilitários de opacidade.** `bg-opacity-*` está deprecado; usar a sintaxe de slash
+5. **Tailwind v4 — utilitários de opacidade.** `bg-opacity-*` está deprecado; usar a sintaxe de slash
    (`bg-green-400/40`). Verificar que nenhum outro `*-opacity-*` permanece nos componentes tocados.
 
-5. **`object-contain` para logo e cards.** Garante que nem o logo (Critério 2: sem corte/distorção) nem a
+6. **`object-contain` para logo e cards.** Garante que nem o logo (Critério 2: sem corte/distorção) nem a
    moldura branca embutida nos PNGs dos cards sejam recortados. Trocar os `object-cover` atuais.
 
 ### Considerações de performance/segurança

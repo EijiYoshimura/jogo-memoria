@@ -11,6 +11,12 @@ export interface GameConfig {
     cardImages: string[]
     cardBack: string
     timeLimitSeconds: number
+    /**
+     * Liga/desliga o timer do jogo (HUB-63). Opcional e retrocompatível.
+     * Ausente/`false` (default) ⇒ timer desativado (não renderiza, sem derrota por tempo).
+     * `true` ⇒ ativa a contagem regressiva (`timeLimitSeconds`) e a derrota por tempo.
+     */
+    timerEnabled?: boolean
     autoResetSeconds?: number
   }
   leadForm: {

@@ -15,7 +15,7 @@ function makeCards(count: number): CardType[] {
   }))
 }
 
-function makeConfig(): GameConfig {
+function makeConfig(timerEnabled?: boolean): GameConfig {
   return {
     event: {
       id: 'e',
@@ -36,6 +36,7 @@ function makeConfig(): GameConfig {
       ],
       cardBack: '/images/card_back.png',
       timeLimitSeconds: 60,
+      ...(timerEnabled === undefined ? {} : { timerEnabled }),
     },
     leadForm: { title: 't', fields: [] },
     adminPin: '1234',
@@ -106,5 +107,19 @@ describe('HUB-63 — layout do board', () => {
     const root = container.firstElementChild as HTMLElement
     expect(root.className).not.toContain('border-blue-500')
     expect(root.style.backgroundColor).toBe('rgb(3, 51, 189)')
+  })
+
+  it('com timerEnabled ausente/false o Timer NAO e renderizado (fiel ao mockup)', () => {
+    const { container } = render(
+      <MemoryGame config={makeConfig(false)} onComplete={() => {}} />
+    )
+    expect(container.querySelector('.tabular-nums')).toBeNull()
+  })
+
+  it('com timerEnabled true o Timer e renderizado no header', () => {
+    const { container } = render(
+      <MemoryGame config={makeConfig(true)} onComplete={() => {}} />
+    )
+    expect(container.querySelector('.tabular-nums')).not.toBeNull()
   })
 })
