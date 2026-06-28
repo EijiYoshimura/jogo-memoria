@@ -4,7 +4,7 @@
     "name": "Evento Demo",
     "logo": "/images/logo_bb.png",
     "primaryColor": "#7C3AED",
-    "backgroundColor": "#1E1B4B"
+    "backgroundColor": "#0333BD"
   },
   "game": {
     "pairs": 6,
@@ -17,7 +17,7 @@
       "/images/card_06.png"
     ],
     "cardBack": "/images/card_back.png",
-    "timeLimitSeconds": 60,
+    "timeLimitSeconds": 999999999999999999999,
     "autoResetSeconds": 30
   },
   "leadForm": {

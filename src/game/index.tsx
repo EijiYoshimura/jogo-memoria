@@ -4,7 +4,6 @@ import type { GameSession } from './domain/entities/GameSession'
 import { startGame } from './domain/use-cases/StartGame'
 import { flipCard, resetFlippedCards } from './domain/use-cases/FlipCard'
 import { Board } from './components/Board'
-import { Timer } from './components/Timer'
 
 interface MemoryGameProps {
   config: GameConfig
@@ -48,37 +47,23 @@ export function MemoryGame({ config, onComplete }: MemoryGameProps) {
     [session, isLocked, startTime, onComplete]
   )
 
-  const handleTick = useCallback((remaining: number) => {
-    setSession((prev) => ({ ...prev, timeRemaining: remaining }))
-  }, [])
-
-  const handleTimeout = useCallback(() => {
-    setSession((prev) => ({ ...prev, status: 'lost' }))
-    const timeTaken = config.game.timeLimitSeconds
-    onComplete(session.matchedPairs, timeTaken)
-  }, [config.game.timeLimitSeconds, session.matchedPairs, onComplete])
-
   return (
     <div
-      className="flex flex-col h-full w-full p-4 gap-4"
+      className="flex flex-col h-full w-full px-[8%] pt-[8%] gap-5"
       style={{ backgroundColor: config.event.backgroundColor }}
     >
-      <div className="flex items-center justify-between px-2">
-        <div className="text-white text-xl font-semibold">
-          Pares: {session.matchedPairs} / {session.totalPairs}
-        </div>
-        <Timer
-          status={session.status}
-          timeRemaining={session.timeRemaining}
-          onTick={handleTick}
-          onTimeout={handleTimeout}
+      <div className="flex justify-center">
+        <img
+          src="/images/logo_jogo_memoria.png"
+          alt="Jogo da Memória — BB Seguros"
+          className="w-3/4 mx-auto object-contain"
+          draggable={false}
         />
       </div>
       <div className="flex-1 min-h-0">
         <Board
           cards={session.cards}
           cardBack={config.game.cardBack}
-          totalPairs={session.totalPairs}
           onCardClick={handleCardClick}
         />
       </div>
