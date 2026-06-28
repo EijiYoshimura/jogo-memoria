@@ -31,6 +31,9 @@ dist-ssr
 # TypeScript cache
 *.tsbuildinfo
 
+# WSL metadata
+*:Zone.Identifier
+
 # Git worktrees
 .worktrees/
 

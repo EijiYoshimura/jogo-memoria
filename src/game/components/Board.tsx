@@ -4,26 +4,12 @@ import { Card } from './Card'
 interface BoardProps {
   cards: CardType[]
   cardBack: string
-  totalPairs: number
   onCardClick: (id: string) => void
 }
 
-function getGridColumns(pairs: number): number {
-  if (pairs <= 3) return 3
-  if (pairs <= 6) return 4
-  return 6
-}
-
-export function Board({ cards, cardBack, totalPairs, onCardClick }: BoardProps) {
-  const columns = getGridColumns(totalPairs)
-
+export function Board({ cards, cardBack, onCardClick }: BoardProps) {
   return (
-    <div
-      className="grid gap-3 w-full h-full"
-      style={{
-        gridTemplateColumns: `repeat(${columns}, 1fr)`,
-      }}
-    >
+    <div className="grid grid-cols-3 gap-5 w-full">
       {cards.map((card) => (
         <Card
           key={card.id}

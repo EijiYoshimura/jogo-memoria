@@ -17,7 +17,7 @@ export function Card({ card, cardBack, onClick }: CardProps) {
 
   return (
     <div
-      className="relative cursor-pointer select-none"
+      className="relative aspect-square cursor-pointer select-none"
       style={{ perspective: '1000px' }}
       onClick={handleClick}
     >
@@ -30,18 +30,18 @@ export function Card({ card, cardBack, onClick }: CardProps) {
         }}
       >
         <div
-          className="absolute inset-0 rounded-xl overflow-hidden bg-gray-200"
+          className="absolute inset-0 rounded-xl overflow-hidden"
           style={{ backfaceVisibility: 'hidden' }}
         >
           <img
             src={cardBack}
             alt="Verso da carta"
-            className="w-full h-full object-cover"
+            className="w-full h-full object-contain"
             draggable={false}
           />
         </div>
         <div
-          className="absolute inset-0 rounded-xl overflow-hidden bg-white"
+          className="absolute inset-0 rounded-xl overflow-hidden"
           style={{
             backfaceVisibility: 'hidden',
             transform: 'rotateY(180deg)',
@@ -50,11 +50,11 @@ export function Card({ card, cardBack, onClick }: CardProps) {
           <img
             src={card.imageUrl}
             alt="Frente da carta"
-            className="w-full h-full object-cover"
+            className="w-full h-full object-contain"
             draggable={false}
           />
           {card.state === 'matched' && (
-            <div className="absolute inset-0 bg-green-400 bg-opacity-40 flex items-center justify-center rounded-xl">
+            <div className="absolute inset-0 bg-green-400/40 flex items-center justify-center rounded-xl">
               <span className="text-4xl">✓</span>
             </div>
           )}
