@@ -7,6 +7,7 @@ const BACKSPACE: KeyboardKey = { label: '⌫', action: 'backspace' }
 const CLEAR: KeyboardKey = { label: 'Limpar', action: 'clear' }
 const SPACE: KeyboardKey = { label: 'espaço', action: 'space' }
 const SHIFT: KeyboardKey = { label: '⇧', action: 'shift' }
+const TOGGLE_SYMBOLS: KeyboardKey = { label: '?123', action: 'toggle-symbols' }
 
 function call(
   currentValue: string,
@@ -93,5 +94,16 @@ describe('applyKey — shift', () => {
 
   it('toggle desliga o shift quando já ativo', () => {
     expect(call('abc', SHIFT, { isShifted: true }).nextShift).toBe(false)
+  })
+})
+
+describe('applyKey — toggle-symbols (no-op preservador)', () => {
+  it('não altera o valor e preserva o shift (modo é resolvido na apresentação)', () => {
+    const off = call('abc', TOGGLE_SYMBOLS, { isShifted: false })
+    expect(off.nextRaw).toBe('abc')
+    expect(off.nextShift).toBe(false)
+    const on = call('abc', TOGGLE_SYMBOLS, { isShifted: true })
+    expect(on.nextRaw).toBe('abc')
+    expect(on.nextShift).toBe(true)
   })
 })
