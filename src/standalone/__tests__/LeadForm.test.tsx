@@ -35,12 +35,34 @@ const consentCheckbox = () => screen.getByRole('checkbox')
 const acceptConsent = () => fireEvent.click(consentCheckbox())
 
 describe('LeadForm — modo LIGADO (virtualKeyboard.enabled: true)', () => {
-  it('suprime o teclado nativo: inputs com readOnly e inputMode none (proxy do Cenário 1)', () => {
+  it('sob VK os inputs são editáveis (sem readOnly, p/ caret) com inputMode none (Cenário 1)', () => {
     render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
     for (const id of ['name', 'email', 'phone']) {
-      expect(input(id).readOnly).toBe(true)
+      // Editável para o caret piscar e o toque posicionar; readOnly não renderiza caret.
+      expect(input(id).readOnly).toBe(false)
+      // inputMode none segue suprimindo o teclado nativo do dispositivo.
       expect(input(id).getAttribute('inputmode')).toBe('none')
     }
+  })
+
+  it('bloqueia a digitação nativa sob VK (só o teclado virtual muta o valor)', () => {
+    render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
+    fireEvent.click(input('name'))
+    // fireEvent retorna false quando o handler chamou preventDefault.
+    expect(fireEvent.keyDown(input('name'), { key: 'a' })).toBe(false)
+    expect(fireEvent.keyDown(input('name'), { key: 'Backspace' })).toBe(false)
+    expect(fireEvent.keyDown(input('name'), { key: 'Delete' })).toBe(false)
+    expect(fireEvent.keyDown(input('name'), { key: 'Enter' })).toBe(false)
+    // navegação/seleção continuam permitidas (para posicionar o caret).
+    expect(fireEvent.keyDown(input('name'), { key: 'ArrowLeft' })).toBe(true)
+    expect(fireEvent.keyDown(input('name'), { key: 'Home' })).toBe(true)
+    // colar não altera o valor.
+    expect(fireEvent.paste(input('name'))).toBe(false)
+  })
+
+  it('sem VK não bloqueia a digitação nativa (paridade atual)', () => {
+    render(<LeadForm config={makeConfig(undefined)} onSubmit={vi.fn()} />)
+    expect(fireEvent.keyDown(input('name'), { key: 'a' })).toBe(true)
   })
 
   it('não renderiza o teclado até um campo ser focado; renderiza ao focar (Cenário 2)', () => {
@@ -153,9 +175,32 @@ describe('LeadForm — edição com caret (HUB-69)', () => {
     expect(input('phone').getAttribute('type')).toBe('tel')
   })
 
-  it('inputs ativos exibem caret visível (caret-color) mesmo readOnly', () => {
+  it('inputs ativos exibem caret visível (caret-color)', () => {
     render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
     expect(input('name').className).toContain('caret-[#0333BD]')
+  })
+
+  it('destaca o campo ativo com borda azul + ring; os demais seguem accent', () => {
+    render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
+    fireEvent.click(input('name'))
+    // ativo: borda azul BB + box-shadow (ring) de destaque
+    expect(input('name').style.borderColor).toBe('rgb(3, 51, 189)')
+    expect(input('name').style.boxShadow).not.toBe('')
+    // inativo: borda accent amarela, sem ring
+    expect(input('email').style.borderColor).toBe('rgb(252, 252, 48)')
+    expect(input('email').style.boxShadow).toBe('')
+    // troca o campo ativo → o destaque acompanha
+    fireEvent.click(input('email'))
+    expect(input('email').style.borderColor).toBe('rgb(3, 51, 189)')
+    expect(input('name').style.borderColor).toBe('rgb(252, 252, 48)')
+  })
+
+  it('campo ativo com erro mantém a borda vermelha (prioridade do estado de erro)', () => {
+    render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
+    acceptConsent()
+    fireEvent.click(input('name')) // ativo, mas vazio e obrigatório
+    fireEvent.click(screen.getByRole('button', { name: 'ENVIAR' }))
+    expect(input('name').style.borderColor).toBe('rgb(239, 68, 68)')
   })
 })
 

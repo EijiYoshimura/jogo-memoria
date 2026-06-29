@@ -17,11 +17,45 @@ interface LeadFormProps {
 
 const DEFAULT_ACCENT_COLOR = '#FCFC30'
 const ERROR_BORDER_COLOR = '#EF4444'
+const ACTIVE_BORDER_COLOR = '#0333BD'
+const ACTIVE_RING_SHADOW = '0 0 0 4px rgba(3, 51, 189, 0.35)'
+const ERROR_RING_SHADOW = '0 0 0 4px rgba(239, 68, 68, 0.35)'
 const CONSENT_REQUIRED_MESSAGE = 'É necessário aceitar os termos para participar'
+
+// Teclas de navegação/controle permitidas sob VK (não mutam o valor do campo).
+const NAVIGATION_KEYS = new Set([
+  'ArrowLeft',
+  'ArrowRight',
+  'ArrowUp',
+  'ArrowDown',
+  'Home',
+  'End',
+  'Tab',
+  'Shift',
+  'Control',
+  'Alt',
+  'Meta',
+])
 
 /** Esmaece um accent em hex 6 dígitos (40% alpha) para o estado desabilitado do botão. */
 function dimmedAccent(hex: string): string {
   return /^#[0-9a-fA-F]{6}$/.test(hex) ? `${hex}66` : hex
+}
+
+/**
+ * Sob VK o input é editável (para o caret aparecer e o toque posicionar), mas a digitação
+ * nativa é bloqueada: apenas o teclado virtual muta o valor. Permite navegação/seleção e
+ * bloqueia qualquer tecla que insira/remova texto (imprimíveis, Backspace, Delete, Enter).
+ */
+function blockNativeTextKey(e: React.KeyboardEvent<HTMLInputElement>): void {
+  if (NAVIGATION_KEYS.has(e.key)) return
+  e.preventDefault()
+}
+
+function blockNativeMutation(
+  e: React.FormEvent<HTMLInputElement> | React.ClipboardEvent | React.DragEvent
+): void {
+  e.preventDefault()
 }
 
 export function LeadForm({ config, onSubmit }: LeadFormProps) {
@@ -145,6 +179,17 @@ export function LeadForm({ config, onSubmit }: LeadFormProps) {
           >
             {config.leadForm.fields.map((field) => {
               const hasError = !!errors[field.id]
+              const isActive = vkEnabled && activeFieldId === field.id
+              const borderColor = hasError
+                ? ERROR_BORDER_COLOR
+                : isActive
+                  ? ACTIVE_BORDER_COLOR
+                  : accent
+              const boxShadow = isActive
+                ? hasError
+                  ? ERROR_RING_SHADOW
+                  : ACTIVE_RING_SHADOW
+                : undefined
               return (
                 <div key={field.id} className="flex flex-col gap-2">
                   <label
@@ -165,8 +210,6 @@ export function LeadForm({ config, onSubmit }: LeadFormProps) {
                       handleChange(field.id, field.type, !!field.mask, e.target.value)
                     }
                     autoComplete="off"
-                    readOnly={vkEnabled}
-                    aria-readonly={vkEnabled || undefined}
                     aria-invalid={hasError || undefined}
                     aria-describedby={hasError ? `${field.id}-error` : undefined}
                     inputMode={
@@ -174,15 +217,22 @@ export function LeadForm({ config, onSubmit }: LeadFormProps) {
                     }
                     {...(vkEnabled
                       ? {
+                          // Editável (sem readOnly) para o caret/toque funcionarem, mas a
+                          // digitação nativa é bloqueada — só o VK muta o valor.
                           onClick: () => setActiveField(field.id),
                           onFocus: () => setActiveField(field.id),
+                          onKeyDown: blockNativeTextKey,
+                          onBeforeInput: blockNativeMutation,
+                          onPaste: blockNativeMutation,
+                          onDrop: blockNativeMutation,
                         }
                       : {})}
-                    className="w-full rounded-full bg-white text-gray-900 border-4 px-5 outline-none font-bb-textos caret-[#0333BD] focus:ring-2 focus:ring-[#0333BD]"
+                    className="w-full rounded-full bg-white text-gray-900 border-4 px-5 outline-none font-bb-textos caret-[#0333BD] transition-shadow focus-visible:ring-2 focus-visible:ring-[#0333BD]"
                     style={{
                       minHeight: '56px',
                       fontSize: '20px',
-                      borderColor: hasError ? ERROR_BORDER_COLOR : accent,
+                      borderColor,
+                      boxShadow,
                     }}
                   />
                   {hasError && (
