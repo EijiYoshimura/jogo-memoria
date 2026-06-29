@@ -1,5 +1,33 @@
 @import "tailwindcss";
 
+/* Fonte oficial Banco do Brasil (HUB-65) — self-hosted, somente as faces usadas. */
+@font-face {
+  font-family: "BB Titulos";
+  src: url("/fonts/Banco_do_Brasil/BancoDoBrasilTitulos-BoldIt.ttf") format("truetype");
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "BB Titulos";
+  src: url("/fonts/Banco_do_Brasil/BancoDoBrasilTitulos-XBold.ttf") format("truetype");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "BB Textos";
+  src: url("/fonts/Banco_do_Brasil/BancoDoBrasilTextos-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@theme {
+  --font-bb-titulos: "BB Titulos", ui-sans-serif, sans-serif;
+  --font-bb-textos: "BB Textos", ui-sans-serif, sans-serif;
+}
+
 * {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;

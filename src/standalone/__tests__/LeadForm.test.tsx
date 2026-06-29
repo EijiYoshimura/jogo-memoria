@@ -120,7 +120,7 @@ describe('LeadForm — validação e submit (comum aos dois modos — Cenários 
   it('bloqueia submit com obrigatório vazio e exibe mensagem', () => {
     const onSubmit = vi.fn()
     render(<LeadForm config={makeConfig(undefined)} onSubmit={onSubmit} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Jogar' }))
+    fireEvent.click(screen.getByRole('button', { name: 'ENVIAR' }))
     expect(onSubmit).not.toHaveBeenCalled()
     expect(screen.getByText('Nome completo é obrigatório')).toBeDefined()
   })
@@ -143,7 +143,7 @@ describe('LeadForm — validação e submit (comum aos dois modos — Cenários 
     render(<LeadForm config={makeConfig(undefined)} onSubmit={onSubmit} />)
     fireEvent.change(input('name'), { target: { value: 'Maria' } })
     fireEvent.change(input('email'), { target: { value: 'maria@exemplo.com' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Jogar' }))
+    fireEvent.click(screen.getByRole('button', { name: 'ENVIAR' }))
     expect(onSubmit).toHaveBeenCalledTimes(1)
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'Maria', email: 'maria@exemplo.com' })
@@ -154,9 +154,56 @@ describe('LeadForm — validação e submit (comum aos dois modos — Cenários 
     render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
     fireEvent.click(input('name'))
     expect(screen.getByRole('group', { name: 'Teclado virtual' })).toBeDefined()
-    fireEvent.click(screen.getByRole('button', { name: 'Jogar' }))
+    fireEvent.click(screen.getByRole('button', { name: 'ENVIAR' }))
     // erro exibido e teclado preservado
     expect(screen.getByText('Nome completo é obrigatório')).toBeDefined()
     expect(screen.getByRole('group', { name: 'Teclado virtual' })).toBeDefined()
+  })
+})
+
+describe('LeadForm — layout BB Seguros (HUB-65)', () => {
+  const label = (id: string) =>
+    document.querySelector(`label[for="${id}"]`) as HTMLLabelElement
+
+  it('exibe o logo BB Seguros e oculta o título em texto (Cenário 3)', () => {
+    render(<LeadForm config={makeConfig(undefined)} onSubmit={vi.fn()} />)
+    const logo = screen.getByAltText('BB Seguros') as HTMLImageElement
+    expect(logo.getAttribute('src')).toBe('/images/logo_bb.png')
+    expect(logo.className).toContain('object-contain')
+    expect(screen.queryByText('Preencha seus dados')).toBeNull()
+  })
+
+  it('labels em maiúsculas, itálico e fonte BB Titulos (Cenário 4)', () => {
+    render(<LeadForm config={makeConfig(undefined)} onSubmit={vi.fn()} />)
+    for (const id of ['name', 'email', 'phone']) {
+      const el = label(id)
+      expect(el.className).toContain('font-bb-titulos')
+      expect(el.className).toContain('italic')
+      expect(el.className).toContain('uppercase')
+    }
+  })
+
+  it('inputs pill branco com borda accent amarela (Cenário 5)', () => {
+    render(<LeadForm config={makeConfig(undefined)} onSubmit={vi.fn()} />)
+    const el = input('name')
+    expect(el.className).toContain('rounded-full')
+    expect(el.className).toContain('bg-white')
+    expect(el.style.borderColor).toBe('rgb(252, 252, 48)')
+  })
+
+  it('botão ENVIAR pill amarelo com texto azul e fonte BB (Cenário 6)', () => {
+    render(<LeadForm config={makeConfig(undefined)} onSubmit={vi.fn()} />)
+    const btn = screen.getByRole('button', { name: 'ENVIAR' })
+    expect(btn.className).toContain('rounded-full')
+    expect(btn.className).toContain('font-bb-titulos')
+    expect(btn.className).toContain('text-[#0333BD]')
+    expect((btn as HTMLButtonElement).style.backgroundColor).toBe('rgb(252, 252, 48)')
+  })
+
+  it('respeita event.accentColor do config quando presente', () => {
+    const cfg = makeConfig(undefined)
+    cfg.event.accentColor = '#00FF00'
+    render(<LeadForm config={cfg} onSubmit={vi.fn()} />)
+    expect(input('name').style.borderColor).toBe('rgb(0, 255, 0)')
   })
 })

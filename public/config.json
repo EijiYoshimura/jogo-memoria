@@ -4,7 +4,8 @@
     "name": "Evento Demo",
     "logo": "/images/logo_bb.png",
     "primaryColor": "#7C3AED",
-    "backgroundColor": "#0333BD"
+    "backgroundColor": "#0333BD",
+    "accentColor": "#FCFC30"
   },
   "game": {
     "pairs": 6,

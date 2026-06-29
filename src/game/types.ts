@@ -5,6 +5,12 @@ export interface GameConfig {
     logo: string
     primaryColor: string
     backgroundColor: string
+    /**
+     * Cor de destaque do evento (HUB-65). Opcional/retrocompatível.
+     * Ausente ⇒ usa o default da apresentação (#FCFC30). Usado na borda dos
+     * inputs e no preenchimento do botão ENVIAR do formulário de lead.
+     */
+    accentColor?: string
   }
   game: {
     pairs: number
