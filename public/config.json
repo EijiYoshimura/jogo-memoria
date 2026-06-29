@@ -20,7 +20,8 @@
     "cardBack": "/images/card_back.png",
     "timeLimitSeconds": 60,
     "timerEnabled": false,
-    "autoResetSeconds": 30
+    "autoResetSeconds": 30,
+    "showBefore": { "enabled": true, "seconds": 2 }
   },
   "leadForm": {
     "title": "Preencha seus dados para jogar!",

@@ -12,12 +12,18 @@ function fisherYatesShuffle<T>(array: T[]): T[] {
   return result
 }
 
-export function startGame(pairs: number, cardImages: string[], timeLimitSeconds: number): GameSession {
+export function startGame(
+  pairs: number,
+  cardImages: string[],
+  timeLimitSeconds: number,
+  showBefore = false,
+): GameSession {
+  const initialCardState: Card['state'] = showBefore ? 'flipped' : 'hidden'
   const pairedCards: Card[] = cardImages.slice(0, pairs).flatMap((imageUrl, index) => {
     const pairId = `pair-${index}`
     return [
-      { id: `${pairId}-a`, pairId, imageUrl, state: 'hidden' as const },
-      { id: `${pairId}-b`, pairId, imageUrl, state: 'hidden' as const },
+      { id: `${pairId}-a`, pairId, imageUrl, state: initialCardState },
+      { id: `${pairId}-b`, pairId, imageUrl, state: initialCardState },
     ]
   })
 
@@ -30,6 +36,6 @@ export function startGame(pairs: number, cardImages: string[], timeLimitSeconds:
     matchedPairs: 0,
     totalPairs: pairs,
     timeRemaining: timeLimitSeconds,
-    status: 'playing',
+    status: showBefore ? 'preview' : 'playing',
   }
 }

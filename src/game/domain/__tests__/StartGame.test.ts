@@ -53,4 +53,32 @@ describe('startGame', () => {
     expect(session.matchedPairs).toBe(0)
     expect(session.totalPairs).toBe(4)
   })
+
+  describe('show before (HUB-76)', () => {
+    it('sem o 4º argumento mantém comportamento atual: cartas hidden e status playing', () => {
+      const session = startGame(4, ['a', 'b', 'c', 'd'], 60)
+      expect(session.status).toBe('playing')
+      expect(session.cards.every((c) => c.state === 'hidden')).toBe(true)
+    })
+
+    it('showBefore=false é retrocompatível: cartas hidden e status playing', () => {
+      const session = startGame(4, ['a', 'b', 'c', 'd'], 60, false)
+      expect(session.status).toBe('playing')
+      expect(session.cards.every((c) => c.state === 'hidden')).toBe(true)
+    })
+
+    it('showBefore=true: todas as cartas flipped e status preview', () => {
+      const session = startGame(4, ['a', 'b', 'c', 'd'], 60, true)
+      expect(session.status).toBe('preview')
+      expect(session.cards.every((c) => c.state === 'flipped')).toBe(true)
+    })
+
+    it('showBefore=true mantém embaralhamento, contagem de cartas e timeRemaining', () => {
+      const session = startGame(4, ['a', 'b', 'c', 'd'], 60, true)
+      expect(session.cards).toHaveLength(8)
+      expect(session.timeRemaining).toBe(60)
+      expect(session.flippedCards).toEqual([])
+      expect(session.matchedPairs).toBe(0)
+    })
+  })
 })

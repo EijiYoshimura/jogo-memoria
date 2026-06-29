@@ -24,6 +24,12 @@ export interface GameConfig {
      */
     timerEnabled?: boolean
     autoResetSeconds?: number
+    /**
+     * Preview "show before" (HUB-76). Opcional e retrocompatível.
+     * Ausente ⇒ fallback { enabled: false, seconds: 2 } ⇒ comportamento atual (sem preview).
+     * `enabled` liga a fase de memorização; `seconds` é a duração em segundos (default 2).
+     */
+    showBefore?: { enabled: boolean; seconds: number }
   }
   leadForm: {
     title: string

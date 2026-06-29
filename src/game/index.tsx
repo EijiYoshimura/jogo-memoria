@@ -1,22 +1,47 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import type { GameConfig } from './types'
 import type { GameSession } from './domain/entities/GameSession'
 import { startGame } from './domain/use-cases/StartGame'
+import { beginPlay } from './domain/use-cases/BeginPlay'
 import { flipCard, resetFlippedCards } from './domain/use-cases/FlipCard'
 import { Board } from './components/Board'
 import { Timer } from './components/Timer'
+import { PreviewBanner } from './components/PreviewBanner'
 
 interface MemoryGameProps {
   config: GameConfig
   onComplete: (score: number, timeTaken: number) => void
 }
 
+const DEFAULT_SHOW_BEFORE = { enabled: false, seconds: 2 } as const
+const FALLBACK_PREVIEW_SECONDS = 2
+
+/** Clamp defensivo: `seconds` inválido (≤0 / não-finito) cai no default, evitando
+ *  preview infinito ou negativo por config malformada. */
+function clampPreviewSeconds(seconds: number): number {
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : FALLBACK_PREVIEW_SECONDS
+}
+
 export function MemoryGame({ config, onComplete }: MemoryGameProps) {
+  const showBefore = config.game.showBefore ?? DEFAULT_SHOW_BEFORE
+  const previewSeconds = clampPreviewSeconds(showBefore.seconds)
+
   const [session, setSession] = useState<GameSession>(() =>
-    startGame(config.game.pairs, config.game.cardImages, config.game.timeLimitSeconds)
+    startGame(config.game.pairs, config.game.cardImages, config.game.timeLimitSeconds, showBefore.enabled)
   )
-  const [startTime] = useState(() => Date.now())
+  // Ancorado no início do 'playing' (não no mount) para o preview não entrar no timeTaken.
+  // No caminho sem preview, o valor do mount já é o correto (joga imediatamente).
+  const startTimeRef = useRef<number>(Date.now())
   const [isLocked, setIsLocked] = useState(false)
+
+  useEffect(() => {
+    if (session.status !== 'preview') return
+    const id = setTimeout(() => {
+      startTimeRef.current = Date.now()
+      setSession((prev) => beginPlay(prev))
+    }, previewSeconds * 1000)
+    return () => clearTimeout(id)
+  }, [session.status, previewSeconds])
 
   const handleCardClick = useCallback(
     (cardId: string) => {
@@ -26,7 +51,7 @@ export function MemoryGame({ config, onComplete }: MemoryGameProps) {
       setSession(next)
 
       if (next.status === 'won') {
-        const timeTaken = Math.round((Date.now() - startTime) / 1000)
+        const timeTaken = Math.round((Date.now() - startTimeRef.current) / 1000)
         onComplete(next.matchedPairs, timeTaken)
         return
       }
@@ -45,7 +70,7 @@ export function MemoryGame({ config, onComplete }: MemoryGameProps) {
         }
       }
     },
-    [session, isLocked, startTime, onComplete]
+    [session, isLocked, onComplete]
   )
 
   const handleTick = useCallback((remaining: number) => {
@@ -69,7 +94,7 @@ export function MemoryGame({ config, onComplete }: MemoryGameProps) {
           className="w-3/4 mx-auto object-contain"
           draggable={false}
         />
-        {config.game.timerEnabled && (
+        {config.game.timerEnabled && session.status === 'playing' && (
           <Timer
             status={session.status}
             timeRemaining={session.timeRemaining}
@@ -79,14 +104,18 @@ export function MemoryGame({ config, onComplete }: MemoryGameProps) {
         )}
       </div>
       {/* Espaçadores em razão 3:8 ancoram o grid na faixa ~20%–84% da altura,
-          deixando mais respiro abaixo (reservado ao futuro botão COMEÇAR). */}
+          deixando mais respiro abaixo (reservado à indicação de preview / futuro botão COMEÇAR). */}
       <div aria-hidden className="grow-[3]" />
-      <Board
-        cards={session.cards}
-        cardBack={config.game.cardBack}
-        onCardClick={handleCardClick}
-      />
-      <div aria-hidden className="grow-[8]" />
+      <div className="w-full" aria-busy={session.status === 'preview'}>
+        <Board
+          cards={session.cards}
+          cardBack={config.game.cardBack}
+          onCardClick={handleCardClick}
+        />
+      </div>
+      <div className="grow-[8] flex items-center justify-center">
+        <PreviewBanner status={session.status} seconds={previewSeconds} />
+      </div>
     </div>
   )
 }
