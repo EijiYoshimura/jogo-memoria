@@ -99,7 +99,7 @@ export function TermsModal({ config, onClose }: TermsModalProps) {
             id={TITLE_ID}
             className="font-bb-titulos font-bold text-[#0333BD] text-xl"
           >
-            Termos de consentimento
+            Termos de uso e política de privacidade
           </h2>
           <button
             type="button"

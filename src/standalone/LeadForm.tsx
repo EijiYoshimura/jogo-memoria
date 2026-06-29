@@ -292,9 +292,9 @@ export function LeadForm({ config, onSubmit }: LeadFormProps) {
                     }}
                     className="underline text-[#FCFC30] font-medium"
                   >
-                    termos de consentimento
+                    termos de consentimento e a Política de Privacidade.
                   </button>{' '}
-                  e a Política de Privacidade.
+
                 </span>
               </label>
               {consentError && (
