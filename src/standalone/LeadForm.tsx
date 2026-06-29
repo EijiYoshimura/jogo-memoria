@@ -118,7 +118,7 @@ export function LeadForm({ config, onSubmit }: LeadFormProps) {
           <img
             src="/images/logo_bb.png"
             alt="BB Seguros"
-            className={`mx-auto object-contain mb-10 ${vkEnabled ? 'w-[40%] mt-2' : 'w-[42%] mt-[9%]'}`}
+            className={`mx-auto object-contain mb-10 ${vkEnabled ? 'w-[55%] mt-2' : 'w-[55%] mt-[9%]'}`}
             draggable={false}
           />
           <form
