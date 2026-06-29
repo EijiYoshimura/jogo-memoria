@@ -388,7 +388,7 @@ describe('LeadForm — consentimento LGPD (HUB-67)', () => {
     const cfg = makeConfig(undefined)
     return { ...cfg, lgpd }
   }
-  const termsLink = () => screen.getByRole('button', { name: 'termos de consentimento' })
+  const termsLink = () => screen.getByRole('button', { name: /termos de consentimento/ })
 
   it('checkbox inicia desmarcado e alterna ao clicar (Cenário 2)', () => {
     render(<LeadForm config={makeConfig(undefined)} onSubmit={vi.fn()} />)
