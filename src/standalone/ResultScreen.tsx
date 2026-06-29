@@ -9,8 +9,12 @@ interface ResultScreenProps {
   onNext: () => void
 }
 
-export function ResultScreen({ config, score, totalPairs, timeTaken, onNext }: ResultScreenProps) {
+const DEFAULT_ACCENT_COLOR = '#FCFC30'
+const CTA_TEXT_COLOR = '#0333BD'
+
+export function ResultScreen({ config, score, totalPairs, onNext }: ResultScreenProps) {
   const isVictory = score === totalPairs
+  const accent = config.event.accentColor ?? DEFAULT_ACCENT_COLOR
   const autoResetSeconds = config.game.autoResetSeconds ?? 30
   const [countdown, setCountdown] = useState(autoResetSeconds)
 
@@ -29,44 +33,55 @@ export function ResultScreen({ config, score, totalPairs, timeTaken, onNext }: R
 
   return (
     <div
-      className="flex flex-col items-center justify-center h-full w-full p-8 gap-8 select-none"
+      className="flex flex-col h-full w-full p-8 select-none"
       style={{ backgroundColor: config.event.backgroundColor }}
       onClick={handleTouch}
     >
-      <div className="text-8xl">{isVictory ? '🏆' : '🎯'}</div>
-
-      {isVictory ? (
-        <div className="text-center">
-          <h1 className="text-5xl font-bold mb-4" style={{ color: config.event.primaryColor }}>
-            Parabéns!
+      <div className="flex flex-1 flex-col items-center justify-center text-center gap-12">
+        {isVictory ? (
+          <>
+            <h1
+              className="font-bb-titulos font-extrabold uppercase text-6xl"
+              style={{ color: accent }}
+            >
+              PARABÉNS!
+            </h1>
+            <p className="font-bb-titulos text-4xl" style={{ color: accent }}>
+              Você ganhou!
+            </p>
+            <p className="font-bb-textos text-white text-2xl">
+              Retire seu brinde na loja BB Seguros
+            </p>
+          </>
+        ) : (
+          /*
+           * Fallback gracioso: o jogo só chega ao resultado ao completar todos
+           * os pares (vitória — timer desativado), então este ramo é defensivo.
+           * Mantemos um título neutro, sem prometer brinde indevidamente.
+           */
+          <h1 className="font-bb-titulos font-extrabold uppercase text-5xl text-white">
+            Obrigado por jogar!
           </h1>
-          <p className="text-white text-2xl">
-            Você encontrou todos os pares em {timeTaken}s!
-          </p>
-        </div>
-      ) : (
-        <div className="text-center">
-          <h1 className="text-5xl font-bold text-white mb-4">Boa tentativa!</h1>
-          <p className="text-gray-300 text-2xl">
-            Você encontrou {score} de {totalPairs} pares.
-          </p>
-        </div>
-      )}
+        )}
+      </div>
 
-      <button
-        className="mt-4 rounded-xl font-bold text-white text-xl px-10 py-4 transition-opacity active:opacity-80"
-        style={{ backgroundColor: config.event.primaryColor, minHeight: '64px' }}
-        onClick={(e) => {
-          e.stopPropagation()
-          onNext()
-        }}
-      >
-        Próximo participante
-      </button>
+      <div className="flex flex-col items-center gap-4">
+        <button
+          type="button"
+          className="rounded-full border-4 border-white font-bb-titulos font-extrabold uppercase text-2xl min-h-[56px] px-10 transition-opacity active:opacity-80"
+          style={{ backgroundColor: accent, color: CTA_TEXT_COLOR }}
+          onClick={(e) => {
+            e.stopPropagation()
+            onNext()
+          }}
+        >
+          Próximo participante
+        </button>
 
-      <p className="text-gray-400 text-lg">
-        Reiniciando em {countdown}s...
-      </p>
+        <p className="font-bb-textos text-white/70 text-lg">
+          Reiniciando em {countdown}s...
+        </p>
+      </div>
     </div>
   )
 }
