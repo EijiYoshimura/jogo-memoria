@@ -267,7 +267,6 @@ describe('LeadForm — SHIFT e auto-shift (HUB-71)', () => {
     fireEvent.click(vkey('a')) // name = 'Ma'
     fireEvent.click(input('email')) // sai do name
     fireEvent.click(input('name')) // volta ao name JÁ preenchido → sem auto-shift
-    input('name').setSelectionRange(2, 2)
     fireEvent.click(vkey('r')) // sem shift → minúscula (se houvesse auto-shift, seria 'R')
     expect(input('name').value).toBe('Mar')
   })
