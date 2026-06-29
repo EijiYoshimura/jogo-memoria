@@ -41,16 +41,16 @@ export function ResultScreen({ config, score, totalPairs, onNext }: ResultScreen
         {isVictory ? (
           <>
             <h1
-              className="font-bb-titulos font-extrabold uppercase text-6xl"
+              className="font-bb-titulos font-extrabold uppercase text-9xl"
               style={{ color: accent }}
             >
               PARABÉNS!
             </h1>
-            <p className="font-bb-titulos text-4xl" style={{ color: accent }}>
+            <p className="font-bb-titulos text-6xl" style={{ color: accent }}>
               Você ganhou!
             </p>
-            <p className="font-bb-textos text-white text-2xl">
-              Retire seu brinde na loja BB Seguros
+            <p className="font-bb-textos text-white text-4xl whitespace-pre-line leading-snug">
+              {'Retire seu brinde\nna loja BB Seguros'}
             </p>
           </>
         ) : (
