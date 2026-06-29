@@ -342,14 +342,17 @@ describe('LeadForm — validação e submit (comum aos dois modos — Cenários 
     )
   })
 
-  it('no modo ligado, submit inválido mantém o teclado virtual disponível (Cenário 11)', () => {
+  it('no modo ligado, submit inválido exibe erro, fecha o teclado e ele reabre ao tocar o campo (Cenário 11 / HUB-86 CA7)', () => {
     render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
     acceptConsent()
     fireEvent.click(input('name'))
     expect(screen.getByRole('group', { name: 'Teclado virtual' })).toBeDefined()
     fireEvent.click(screen.getByRole('button', { name: 'ENVIAR' }))
-    // erro exibido e teclado preservado
+    // erro exibido; ENVIAR fecha o teclado no mesmo toque (HUB-86 CA7), mesmo inválido
     expect(screen.getByText('Nome completo é obrigatório')).toBeDefined()
+    expect(screen.queryByRole('group', { name: 'Teclado virtual' })).toBeNull()
+    // segue disponível: tocar o campo reabre o teclado para corrigir
+    fireEvent.click(input('name'))
     expect(screen.getByRole('group', { name: 'Teclado virtual' })).toBeDefined()
   })
 })
@@ -500,5 +503,93 @@ describe('LeadForm — consentimento LGPD (HUB-67)', () => {
     expect(screen.getByText('É necessário aceitar os termos para participar')).toBeDefined()
     acceptConsent()
     expect(screen.queryByText('É necessário aceitar os termos para participar')).toBeNull()
+  })
+})
+
+describe('LeadForm — dispensar teclado ao tocar fora (HUB-86)', () => {
+  const keyboard = () => screen.queryByRole('group', { name: 'Teclado virtual' })
+  const logo = () => screen.getByAltText('BB Seguros')
+  const termsLink = () => screen.getByRole('button', { name: /termos de consentimento/ })
+
+  it('CA1 — fecha ao tocar em área neutra (logo) com o teclado aberto no layout alpha', () => {
+    render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
+    fireEvent.click(input('name'))
+    expect(keyboard()).not.toBeNull()
+    fireEvent.click(logo())
+    expect(keyboard()).toBeNull()
+  })
+
+  it('CA1 — fecha ao tocar em área neutra com o teclado aberto noutro layout (campo e-mail)', () => {
+    render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
+    fireEvent.click(input('email'))
+    expect(keyboard()).not.toBeNull()
+    fireEvent.click(logo())
+    expect(keyboard()).toBeNull()
+  })
+
+  it('CA2 — tocar numa tecla mantém o teclado aberto e insere o caractere', () => {
+    render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
+    fireEvent.click(input('name')) // name vazio → auto-shift: 1ª maiúscula
+    fireEvent.click(vkey('M'))
+    expect(input('name').value).toBe('M')
+    expect(keyboard()).not.toBeNull()
+  })
+
+  it('CA3 — tocar no input do campo B mantém aberto e troca o campo', () => {
+    render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
+    fireEvent.click(input('name'))
+    fireEvent.click(input('email'))
+    expect(keyboard()).not.toBeNull()
+    // o destaque do campo ativo migra para o e-mail (troca de campo preservada)
+    expect(input('email').style.borderColor).toBe('rgb(3, 51, 189)')
+    expect(input('name').style.borderColor).toBe('rgb(252, 252, 48)')
+  })
+
+  it('CA4 — após fechar por toque fora, tocar num campo reabre o teclado', () => {
+    render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
+    fireEvent.click(input('name'))
+    fireEvent.click(logo())
+    expect(keyboard()).toBeNull()
+    fireEvent.click(input('email'))
+    expect(keyboard()).not.toBeNull()
+  })
+
+  it('CA5 — tocar no link de termos abre o modal e fecha o teclado (toque único)', () => {
+    render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
+    fireEvent.click(input('name'))
+    expect(keyboard()).not.toBeNull()
+    fireEvent.click(termsLink())
+    expect(screen.getByRole('dialog')).toBeDefined()
+    expect(keyboard()).toBeNull()
+  })
+
+  it('CA6 — tocar no checkbox alterna o estado e fecha o teclado (toque único)', () => {
+    render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
+    fireEvent.click(input('name'))
+    expect(consentCheckbox()).toHaveProperty('checked', false)
+    fireEvent.click(consentCheckbox())
+    expect(consentCheckbox()).toHaveProperty('checked', true)
+    expect(keyboard()).toBeNull()
+  })
+
+  it('CA7 — tocar em ENVIAR (form válido) dispara o submit e fecha o teclado (toque único)', () => {
+    const onSubmit = vi.fn()
+    render(<LeadForm config={makeConfig(true)} onSubmit={onSubmit} />)
+    fireEvent.change(input('name'), { target: { value: 'Maria' } })
+    fireEvent.change(input('email'), { target: { value: 'maria@exemplo.com' } })
+    acceptConsent()
+    fireEvent.click(input('name')) // abre o teclado
+    expect(keyboard()).not.toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'ENVIAR' }))
+    expect(onSubmit).toHaveBeenCalledTimes(1)
+    expect(keyboard()).toBeNull()
+  })
+
+  it('CA8 — com VK desabilitado não há teclado e o handler de dispensa é inerte', () => {
+    render(<LeadForm config={makeConfig(false)} onSubmit={vi.fn()} />)
+    expect(keyboard()).toBeNull()
+    fireEvent.click(logo())
+    fireEvent.click(input('name'))
+    expect(keyboard()).toBeNull()
   })
 })

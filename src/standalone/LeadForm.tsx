@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { GameConfig } from '../game/types'
 import {
   applyKey,
@@ -65,6 +65,9 @@ export function LeadForm({ config, onSubmit, measureText }: LeadFormProps) {
   // React: `caretPos` por campo + `caretScrollLeft` do campo ativo. `refocusActive`
   // re-foca o input após o clique numa tecla (que rouba o foco) — só quando há tecla.
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({})
+  // Container do teclado virtual: o handler de "tocar fora" (HUB-86) usa `contains` para
+  // distinguir toques no teclado (mantêm aberto) de toques numa área neutra (fecham).
+  const keyboardRef = useRef<HTMLDivElement>(null)
   const refocusActive = useRef(false)
   const [caretPos, setCaretPos] = useState<Record<string, number>>({})
   const [caretScrollLeft, setCaretScrollLeft] = useState(0)
@@ -161,6 +164,33 @@ export function LeadForm({ config, onSubmit, measureText }: LeadFormProps) {
     if (caretScrollLeft !== nextScroll) setCaretScrollLeft(nextScroll)
   }, [vkEnabled, activeFieldId, values, caretPos, caretScrollLeft, measure])
 
+  // Dispensa o teclado ao tocar fora dos campos e do teclado (HUB-86). Ligado ao `onClick`
+  // do root (fase bubble): o `click` do alvo (ENVIAR/checkbox) roda ANTES de borbular até
+  // aqui, então a ação acontece no mesmo toque e só depois fechamos o teclado. NÃO chama
+  // preventDefault/stopPropagation. Inerte quando o teclado está desligado ou já fechado.
+  function handleRootClick(e: React.MouseEvent) {
+    if (!vkEnabled || !activeFieldId) return
+    const target = e.target as Node
+    // Toque num input de campo (texto/email/tel): a troca de campo segue pelo onClick/onFocus
+    // do input — só o checkbox de consentimento é `<input>` mas NÃO está em inputRefs (fecha).
+    const inField = Object.values(inputRefs.current).some((el) => el?.contains(target))
+    if (inField) return
+    // Toque numa tecla/long-press/backspace dentro do teclado: mantém aberto.
+    if (keyboardRef.current?.contains(target)) return
+    setActiveField(null)
+    setShift(false)
+  }
+
+  // O link de termos faz `stopPropagation` no próprio click (para o label não alternar o
+  // checkbox), então seu click não borbulha ao root. Fechamos o teclado de forma declarativa
+  // quando o modal abre: toque único no link abre o modal E dispensa o teclado (CA5).
+  useEffect(() => {
+    if (showTerms) {
+      setActiveField(null)
+      setShift(false)
+    }
+  }, [showTerms, setActiveField, setShift])
+
   function validate(): boolean {
     const newErrors: Record<string, string> = {}
     for (const field of config.leadForm.fields) {
@@ -194,6 +224,7 @@ export function LeadForm({ config, onSubmit, measureText }: LeadFormProps) {
     <div
       className="flex flex-col h-full w-full overflow-hidden rounded-[2.25rem] border-8 border-white"
       style={{ backgroundColor: config.event.backgroundColor }}
+      onClick={handleRootClick}
     >
       <div
         className={`flex flex-col items-center w-full px-[8%] py-8 overflow-y-auto ${
@@ -353,12 +384,14 @@ export function LeadForm({ config, onSubmit, measureText }: LeadFormProps) {
         </div>
       </div>
       {vkEnabled && activeLayout && (
-        <VirtualKeyboard
-          layout={activeLayout}
-          isShifted={isShifted}
-          onKey={handleVirtualKey}
-          visible={!!activeFieldId}
-        />
+        <div ref={keyboardRef} className="w-full shrink-0">
+          <VirtualKeyboard
+            layout={activeLayout}
+            isShifted={isShifted}
+            onKey={handleVirtualKey}
+            visible={!!activeFieldId}
+          />
+        </div>
       )}
       {showTerms && <TermsModal config={config} onClose={() => setShowTerms(false)} />}
     </div>
