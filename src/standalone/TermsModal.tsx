@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { GameConfig } from '../game/types'
-import { buildConsentText } from './lib/lgpd'
+import { buildConsentText, getPurposeText } from './lib/lgpd'
 import { PrivacyPolicyScreen } from './PrivacyPolicyScreen'
 
 interface TermsModalProps {
@@ -28,6 +28,7 @@ export function TermsModal({ config, onClose }: TermsModalProps) {
   const [showPolicy, setShowPolicy] = useState(false)
 
   const consentText = buildConsentText(config)
+  const purposeText = getPurposeText(config)
   const privacyPolicyPath = config.lgpd?.privacyPolicyPath
   const privacyPolicyUrl = config.lgpd?.privacyPolicyUrl
 
@@ -91,7 +92,7 @@ export function TermsModal({ config, onClose }: TermsModalProps) {
         aria-labelledby={TITLE_ID}
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md max-h-[80vh] flex flex-col bg-white rounded-[1.5rem] shadow-2xl outline-none"
+        className="w-[80%] max-w-none max-h-[80vh] flex flex-col bg-white rounded-[1.5rem] shadow-2xl outline-none"
       >
         <div className="flex items-center justify-between p-6 pb-4">
           <h2
@@ -111,7 +112,24 @@ export function TermsModal({ config, onClose }: TermsModalProps) {
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 font-bb-textos text-gray-800 text-base leading-relaxed">
-          <p style={{ whiteSpace: 'pre-line' }}>{consentText}</p>
+          <div>
+            <h3 className="font-bb-titulos font-bold text-[#0333BD] text-sm">
+              Termos de Uso
+            </h3>
+            <p className="mt-1" style={{ whiteSpace: 'pre-line' }}>
+              {consentText}
+            </p>
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <h3 className="font-bb-titulos font-bold text-[#0333BD] text-sm">
+              Política de Privacidade
+            </h3>
+            <p className="mt-1" style={{ whiteSpace: 'pre-line' }}>
+              {purposeText}
+            </p>
+          </div>
+
           {privacyPolicyPath ? (
             <p className="mt-4">
               <button

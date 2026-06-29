@@ -4,6 +4,7 @@ import {
   DEFAULT_PURPOSE_TEXT,
   DEFAULT_RETENTION_MONTHS,
   buildConsentText,
+  getPurposeText,
 } from '../lgpd'
 import type { GameConfig } from '../../../game/types'
 
@@ -97,5 +98,29 @@ describe('buildConsentText — custom (HUB-60)', () => {
   it('fallback seguro sem config.lgpd: não lança e usa event.name', () => {
     expect(() => buildConsentText(baseConfig)).not.toThrow()
     expect(buildConsentText(baseConfig)).toContain('Evento Teste')
+  })
+})
+
+describe('getPurposeText (HUB-74)', () => {
+  it('retorna o purposeText do config quando definido', () => {
+    expect(getPurposeText(withLgpd({ purposeText: 'para fins de pesquisa' }))).toBe(
+      'para fins de pesquisa'
+    )
+  })
+
+  it('usa o DEFAULT_PURPOSE_TEXT quando lgpd não definido', () => {
+    expect(getPurposeText(baseConfig)).toBe(DEFAULT_PURPOSE_TEXT)
+  })
+
+  it('usa o DEFAULT_PURPOSE_TEXT quando purposeText é vazio/espacos', () => {
+    expect(getPurposeText(withLgpd({ purposeText: '   ' }))).toBe(DEFAULT_PURPOSE_TEXT)
+  })
+
+  it('é independente do consentText custom (sempre disponível)', () => {
+    const config = withLgpd({
+      consentText: 'Texto custom de consentimento.',
+      purposeText: 'para contato comercial',
+    })
+    expect(getPurposeText(config)).toBe('para contato comercial')
   })
 })

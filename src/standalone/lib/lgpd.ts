@@ -32,3 +32,13 @@ export function buildConsentText(config: GameConfig): string {
     `excluídos a qualquer momento mediante solicitação.`
   )
 }
+
+/**
+ * Finalidade do uso dos dados (fragmento configurável). Independe do `consentText`
+ * custom — sempre disponível para exibição destacada. Prioriza `config.lgpd.purposeText`
+ * (quando não-vazio) e cai no `DEFAULT_PURPOSE_TEXT`. Retorna string pura, sem HTML.
+ */
+export function getPurposeText(config: GameConfig): string {
+  const purposeText = config.lgpd?.purposeText?.trim()
+  return purposeText || DEFAULT_PURPOSE_TEXT
+}
