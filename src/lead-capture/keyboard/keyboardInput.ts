@@ -1,7 +1,15 @@
-// Núcleo puro: aplicação de tecla. Agnóstico de máscara e de framework de form.
-// Retorna sempre `raw`; o consumidor (LeadForm) aplica sua própria máscara/validação.
+// Núcleo puro: aplicação de tecla. Agnóstico de framework de form e sem DOM.
+// O caret entra como dado (`caretStart`) e sai como dado (`nextCaret`); o consumidor
+// (LeadForm) lê/escreve a `selectionStart` do `<input>`. Sempre retorna `nextRaw`
+// (o consumidor reaplica a própria máscara/validação).
 
 import type { KeyboardKey } from './keyboardLayouts'
+import {
+  applyPhoneMask,
+  maskedToRawIndex,
+  rawToMaskedIndex,
+  MAX_PHONE_DIGITS,
+} from '../mask/phoneMask'
 
 export interface ApplyKeyInput {
   /** Valor atual do campo (já mascarado, no caso de tel). */
@@ -12,6 +20,10 @@ export interface ApplyKeyInput {
   fieldType: string
   /** Se o campo possui máscara (ex.: tel). */
   hasMask: boolean
+  /** Posição do caret no `currentValue`. Default = fim (retrocompat HUB-57). */
+  caretStart?: number
+  /** Fim da seleção; se `start !== end` (range), trata-se como `caretStart` (decisão PO 2). */
+  caretEnd?: number
 }
 
 export interface ApplyKeyResult {
@@ -19,35 +31,105 @@ export interface ApplyKeyResult {
   nextRaw: string
   /** Próximo estado de shift. */
   nextShift: boolean
+  /** Nova posição do caret, nas coords do valor exibido após o consumidor reaplicar a máscara. */
+  nextCaret: number
+}
+
+/** Resolve o caret efetivo: default = fim; range → trata como `caretStart`; clampa em [0, len]. */
+function resolveCaret(input: ApplyKeyInput): number {
+  const len = input.currentValue.length
+  const start = input.caretStart ?? len
+  return Math.max(0, Math.min(start, len))
+}
+
+function onlyDigits(value: string): string {
+  return value.replace(/\D/g, '')
+}
+
+/** Insere dígito(s) na posição do caret sobre os dígitos crus do tel e reaplica a máscara. */
+function applyTelChar(input: ApplyKeyInput): ApplyKeyResult {
+  const { currentValue, key, isShifted } = input
+  const caret = resolveCaret(input)
+  const rawDigits = onlyDigits(currentValue)
+  const rawCaret = maskedToRawIndex(currentValue, caret)
+  const insertedDigits = onlyDigits(key.value ?? '')
+
+  const newDigits = (
+    rawDigits.slice(0, rawCaret) +
+    insertedDigits +
+    rawDigits.slice(rawCaret)
+  ).slice(0, MAX_PHONE_DIGITS)
+  const newRawCaret = Math.min(rawCaret + insertedDigits.length, newDigits.length)
+  const newMasked = applyPhoneMask(newDigits)
+  return { nextRaw: newDigits, nextShift: isShifted, nextCaret: rawToMaskedIndex(newMasked, newRawCaret) }
+}
+
+/** Remove o dígito cru à esquerda do caret no tel; no-op se não houver dígito à esquerda. */
+function applyTelBackspace(input: ApplyKeyInput): ApplyKeyResult {
+  const { currentValue, isShifted } = input
+  const caret = resolveCaret(input)
+  const rawDigits = onlyDigits(currentValue)
+  const rawCaret = maskedToRawIndex(currentValue, caret)
+  if (rawCaret === 0) {
+    return { nextRaw: rawDigits, nextShift: isShifted, nextCaret: 0 }
+  }
+  const newDigits = rawDigits.slice(0, rawCaret - 1) + rawDigits.slice(rawCaret)
+  const newMasked = applyPhoneMask(newDigits)
+  return {
+    nextRaw: newDigits,
+    nextShift: isShifted,
+    nextCaret: rawToMaskedIndex(newMasked, rawCaret - 1),
+  }
 }
 
 function applyChar(input: ApplyKeyInput): ApplyKeyResult {
-  const { currentValue, key, isShifted } = input
+  const { currentValue, key, isShifted, fieldType, hasMask } = input
+  if (hasMask && fieldType === 'tel') return applyTelChar(input)
+
   const raw = key.value ?? ''
   const inserted = isShifted && raw.length === 1 ? raw.toUpperCase() : raw
 
-  // Regra anti-`@@`: atalho/tecla iniciando em '@' substitui do '@' existente em diante.
-  let base = currentValue
+  // Atalhos de domínio (ex.: '@gmail.com') e a tecla '@' permanecem âncora-fim, com a
+  // regra anti-`@@`: inserir um domínio "no meio" não faz sentido (decisão técnica 1).
   if (raw.startsWith('@') && currentValue.includes('@')) {
-    base = currentValue.slice(0, currentValue.indexOf('@'))
+    const base = currentValue.slice(0, currentValue.indexOf('@'))
+    const nextRaw = base + inserted
+    return { nextRaw, nextShift: isShifted, nextCaret: nextRaw.length }
+  }
+  if (inserted.length > 1) {
+    const nextRaw = currentValue + inserted
+    return { nextRaw, nextShift: isShifted, nextCaret: nextRaw.length }
   }
 
-  return { nextRaw: base + inserted, nextShift: isShifted }
+  // Inserção de 1 caractere é caret-posicionada.
+  const caret = resolveCaret(input)
+  const nextRaw = currentValue.slice(0, caret) + inserted + currentValue.slice(caret)
+  return { nextRaw, nextShift: isShifted, nextCaret: caret + inserted.length }
 }
 
 function applyBackspace(input: ApplyKeyInput): ApplyKeyResult {
   const { currentValue, fieldType, hasMask, isShifted } = input
-  if (fieldType === 'tel' && hasMask) {
-    // Remove o último dígito cru; a máscara é recalculada pelo consumidor.
-    const digits = currentValue.replace(/\D/g, '').slice(0, -1)
-    return { nextRaw: digits, nextShift: isShifted }
+  if (hasMask && fieldType === 'tel') return applyTelBackspace(input)
+
+  const caret = resolveCaret(input)
+  if (caret === 0) {
+    // Caret no início = no-op (decisão PO 1).
+    return { nextRaw: currentValue, nextShift: isShifted, nextCaret: 0 }
   }
-  return { nextRaw: currentValue.slice(0, -1), nextShift: isShifted }
+  const nextRaw = currentValue.slice(0, caret - 1) + currentValue.slice(caret)
+  return { nextRaw, nextShift: isShifted, nextCaret: caret - 1 }
+}
+
+function applySpace(input: ApplyKeyInput): ApplyKeyResult {
+  const { currentValue, isShifted } = input
+  const caret = resolveCaret(input)
+  const nextRaw = currentValue.slice(0, caret) + ' ' + currentValue.slice(caret)
+  return { nextRaw, nextShift: isShifted, nextCaret: caret + 1 }
 }
 
 /**
- * Aplica uma tecla ao valor atual e devolve o `raw` resultante + próximo shift.
- * O append/backspace atuam no fim da string (decisão de escopo MVP: sem caret no meio).
+ * Aplica uma tecla ao valor atual e devolve o `raw` resultante, o próximo shift e a nova
+ * posição do caret. Sem `caretStart`, o caret é o fim da string (retrocompat HUB-57).
  */
 export function applyKey(input: ApplyKeyInput): ApplyKeyResult {
   const action = input.key.action ?? 'char'
@@ -57,14 +139,14 @@ export function applyKey(input: ApplyKeyInput): ApplyKeyResult {
     case 'backspace':
       return applyBackspace(input)
     case 'clear':
-      return { nextRaw: '', nextShift: input.isShifted }
+      return { nextRaw: '', nextShift: input.isShifted, nextCaret: 0 }
     case 'space':
-      return { nextRaw: input.currentValue + ' ', nextShift: input.isShifted }
+      return applySpace(input)
     case 'shift':
-      return { nextRaw: input.currentValue, nextShift: !input.isShifted }
+      return { nextRaw: input.currentValue, nextShift: !input.isShifted, nextCaret: resolveCaret(input) }
     case 'toggle-symbols':
-      // Troca de modo é resolvida na apresentação (VirtualKeyboard); aqui é no-op
-      // total — mantém o switch exaustivo e type-safe sobre KeyAction (sem default).
-      return { nextRaw: input.currentValue, nextShift: input.isShifted }
+      // Troca de modo é resolvida na apresentação (VirtualKeyboard); aqui é no-op total —
+      // mantém o switch exaustivo e type-safe sobre KeyAction (sem default).
+      return { nextRaw: input.currentValue, nextShift: input.isShifted, nextCaret: resolveCaret(input) }
   }
 }

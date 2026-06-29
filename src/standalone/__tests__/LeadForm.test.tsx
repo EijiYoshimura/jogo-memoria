@@ -95,6 +95,70 @@ describe('LeadForm — modo LIGADO (virtualKeyboard.enabled: true)', () => {
   })
 })
 
+describe('LeadForm — edição com caret (HUB-69)', () => {
+  function typeName(text: string) {
+    fireEvent.click(input('name'))
+    for (const c of text) fireEvent.click(vkey(c))
+  }
+
+  it('reposiciona o caret ao fim após digitar pelo teclado virtual (Cenário 7)', () => {
+    render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
+    typeName('maria')
+    expect(input('name').value).toBe('maria')
+    expect(input('name').selectionStart).toBe(5)
+  })
+
+  it('toque posiciona o caret e a tecla insere no meio, avançando 1 (Cenários 2/3)', () => {
+    render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
+    typeName('maria')
+    input('name').setSelectionRange(3, 3) // toque entre 'mar' e 'ia'
+    fireEvent.click(vkey('x'))
+    expect(input('name').value).toBe('marxia')
+    expect(input('name').selectionStart).toBe(4)
+  })
+
+  it('backspace remove o caractere à esquerda do caret no meio (Cenário 4)', () => {
+    render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
+    typeName('maria')
+    input('name').setSelectionRange(3, 3)
+    fireEvent.click(vkey('Apagar'))
+    expect(input('name').value).toBe('maia')
+    expect(input('name').selectionStart).toBe(2)
+  })
+
+  it('backspace com caret no início é no-op (Cenário 5)', () => {
+    render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
+    typeName('maria')
+    input('name').setSelectionRange(0, 0)
+    fireEvent.click(vkey('Apagar'))
+    expect(input('name').value).toBe('maria')
+    expect(input('name').selectionStart).toBe(0)
+  })
+
+  it('edita o telefone no meio reaplicando a máscara e reposicionando o caret (Cenário 8)', () => {
+    render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
+    fireEvent.click(input('phone'))
+    for (const d of '1198765') fireEvent.click(vkey(d))
+    expect(input('phone').value).toBe('(11) 98765')
+    input('phone').setSelectionRange(7, 7) // logo após o 4º dígito ('8')
+    fireEvent.click(vkey('0'))
+    expect(input('phone').value).toBe('(11) 98076-5')
+    expect(input('phone').selectionStart).toBe(8)
+  })
+
+  it('remapeia email→text sob VK preservando inputMode none (achado crítico do Tech Lead)', () => {
+    render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
+    expect(input('email').getAttribute('type')).toBe('text')
+    expect(input('email').getAttribute('inputmode')).toBe('none')
+    expect(input('phone').getAttribute('type')).toBe('tel')
+  })
+
+  it('inputs ativos exibem caret visível (caret-color) mesmo readOnly', () => {
+    render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
+    expect(input('name').className).toContain('caret-[#0333BD]')
+  })
+})
+
 describe('LeadForm — modo DESLIGADO (default)', () => {
   it('sem config de teclado: inputs não têm readOnly e usam teclado nativo (paridade atual)', () => {
     render(<LeadForm config={makeConfig(undefined)} onSubmit={vi.fn()} />)
@@ -102,6 +166,8 @@ describe('LeadForm — modo DESLIGADO (default)', () => {
     expect(input('name').getAttribute('inputmode')).toBeNull()
     // tel mantém inputMode numeric como hoje
     expect(input('phone').getAttribute('inputmode')).toBe('numeric')
+    // sem VK, e-mail permanece type="email" (sem remap; HUB-69)
+    expect(input('email').getAttribute('type')).toBe('email')
     expect(screen.queryByRole('group', { name: 'Teclado virtual' })).toBeNull()
   })
 

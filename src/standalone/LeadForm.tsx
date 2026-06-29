@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { GameConfig } from '../game/types'
 import {
   applyKey,
@@ -7,6 +7,7 @@ import {
   VirtualKeyboard,
   type KeyboardKey,
 } from '../lead-capture/keyboard'
+import { applyPhoneMask } from '../lead-capture/mask/phoneMask'
 import { TermsModal } from './TermsModal'
 
 interface LeadFormProps {
@@ -23,13 +24,6 @@ function dimmedAccent(hex: string): string {
   return /^#[0-9a-fA-F]{6}$/.test(hex) ? `${hex}66` : hex
 }
 
-function applyPhoneMask(value: string): string {
-  const digits = value.replace(/\D/g, '').slice(0, 11)
-  if (digits.length <= 2) return digits
-  if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`
-  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`
-}
-
 export function LeadForm({ config, onSubmit }: LeadFormProps) {
   const [values, setValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(config.leadForm.fields.map((f) => [f.id, '']))
@@ -42,6 +36,10 @@ export function LeadForm({ config, onSubmit }: LeadFormProps) {
   const vkEnabled = config.leadForm.virtualKeyboard?.enabled ?? false
   const accent = config.event.accentColor ?? DEFAULT_ACCENT_COLOR
   const { activeFieldId, isShifted, setActiveField, setShift } = useVirtualKeyboard(vkEnabled)
+
+  // Caret no input controlado: refs por campo + posição-alvo a reaplicar após o re-render.
+  const inputRefs = useRef<Record<string, HTMLInputElement | null>>({})
+  const pendingCaret = useRef<number | null>(null)
 
   const activeField = config.leadForm.fields.find((f) => f.id === activeFieldId) ?? null
   const activeLayout = useMemo(
@@ -59,19 +57,38 @@ export function LeadForm({ config, onSubmit }: LeadFormProps) {
 
   function handleVirtualKey(key: KeyboardKey) {
     if (!activeField) return
+    const el = inputRefs.current[activeField.id]
     const current = values[activeField.id] ?? ''
-    const { nextRaw, nextShift } = applyKey({
+    // Lê o caret no momento da tecla; tocar no campo já posiciona a selectionStart (Cenário 2).
+    const caretStart = el?.selectionStart ?? current.length
+    const caretEnd = el?.selectionEnd ?? caretStart
+    const { nextRaw, nextShift, nextCaret } = applyKey({
       currentValue: current,
       key,
       isShifted,
       fieldType: activeField.type,
       hasMask: !!activeField.mask,
+      caretStart,
+      caretEnd,
     })
     setShift(nextShift)
+    pendingCaret.current = nextCaret
     if ((key.action ?? 'char') !== 'shift') {
       handleChange(activeField.id, activeField.type, !!activeField.mask, nextRaw)
     }
   }
+
+  // Reposiciona o caret após o re-render controlado e re-foca o campo ativo (o clique na
+  // tecla "rouba" o foco). useLayoutEffect evita flicker entre o paint e o reposicionamento.
+  useLayoutEffect(() => {
+    const target = pendingCaret.current
+    if (target === null || !activeFieldId) return
+    const el = inputRefs.current[activeFieldId]
+    if (!el) return
+    el.focus()
+    el.setSelectionRange(target, target)
+    pendingCaret.current = null
+  })
 
   function validate(): boolean {
     const newErrors: Record<string, string> = {}
@@ -139,7 +156,10 @@ export function LeadForm({ config, onSubmit }: LeadFormProps) {
                   </label>
                   <input
                     id={field.id}
-                    type={field.type}
+                    ref={(el) => {
+                      inputRefs.current[field.id] = el
+                    }}
+                    type={vkEnabled && field.type === 'email' ? 'text' : field.type}
                     value={values[field.id] ?? ''}
                     onChange={(e) =>
                       handleChange(field.id, field.type, !!field.mask, e.target.value)
@@ -158,7 +178,7 @@ export function LeadForm({ config, onSubmit }: LeadFormProps) {
                           onFocus: () => setActiveField(field.id),
                         }
                       : {})}
-                    className="w-full rounded-full bg-white text-gray-900 border-4 px-5 outline-none font-bb-textos focus:ring-2 focus:ring-[#0333BD]"
+                    className="w-full rounded-full bg-white text-gray-900 border-4 px-5 outline-none font-bb-textos caret-[#0333BD] focus:ring-2 focus:ring-[#0333BD]"
                     style={{
                       minHeight: '56px',
                       fontSize: '20px',
