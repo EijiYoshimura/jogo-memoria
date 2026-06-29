@@ -16,11 +16,27 @@ export interface VirtualKeyboardProps {
   visible: boolean
 }
 
+/** Alinhamento horizontal do popup relativo à tecla (clamp nas bordas). */
+type PopupEdge = 'left' | 'center' | 'right'
+
+const POPUP_ANCHOR: Record<PopupEdge, string> = {
+  left: 'left-0',
+  center: 'left-1/2 -translate-x-1/2',
+  right: 'right-0',
+}
+
 const CONTROL_ARIA_LABELS: Record<string, string> = {
   backspace: 'Apagar',
   clear: 'Limpar campo',
   space: 'Espaço',
   shift: 'Maiúscula',
+}
+
+/** Posição da tecla na fileira → borda para o clamp do popup (extremidades não cortam). */
+function edgeForIndex(index: number, rowLength: number): PopupEdge {
+  if (index <= 1) return 'left'
+  if (index >= rowLength - 2) return 'right'
+  return 'center'
 }
 
 function isCharKey(key: KeyboardKey): boolean {
@@ -43,7 +59,7 @@ function keyClassName(key: KeyboardKey, isShifted: boolean, naturalWidth: boolea
   const base =
     'flex items-center justify-center rounded-xl select-none transition-transform ' +
     'active:scale-95 touch-manipulation font-medium'
-  const sizing = naturalWidth ? 'w-[84px] h-[64px] text-2xl' : 'min-h-[60px] min-w-[40px] text-2xl px-1'
+  const sizing = naturalWidth ? 'w-[84px] h-[64px] text-2xl' : 'w-full min-h-[60px] text-2xl px-1'
   const shiftActive = key.action === 'shift' && isShifted
   let palette: string
   if (shiftActive || active) {
@@ -56,20 +72,66 @@ function keyClassName(key: KeyboardKey, isShifted: boolean, naturalWidth: boolea
   return `${base} ${sizing} ${palette}`
 }
 
+function VariantBalloon({
+  originKey,
+  isShifted,
+  edge,
+  onSelect,
+}: {
+  originKey: KeyboardKey
+  isShifted: boolean
+  edge: PopupEdge
+  onSelect: (variant: string) => void
+}) {
+  const variants = originKey.variants ?? []
+  return (
+    <div
+      role="group"
+      aria-label={`Variantes de ${originKey.value ?? originKey.label}`}
+      className={
+        'absolute bottom-full z-30 mb-2 flex gap-1 rounded-2xl bg-white p-1.5 ' +
+        'border-2 border-[#FCFC30] shadow-2xl ' +
+        POPUP_ANCHOR[edge]
+      }
+    >
+      {variants.map((v, i) => {
+        const shown = isShifted ? v.toUpperCase() : v
+        return (
+          <button
+            key={`v-${i}`}
+            type="button"
+            aria-label={shown}
+            onClick={() => onSelect(v)}
+            className="flex min-h-[52px] min-w-[48px] items-center justify-center rounded-xl text-2xl text-[#0A2472] transition-transform active:scale-95 active:bg-[#FCFC30] touch-manipulation"
+          >
+            {shown}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 function KeyButton({
   k,
   isShifted,
   naturalWidth,
   active,
+  edge,
+  popupOpen,
   onActivate,
   onLongPress,
+  onSelectVariant,
 }: {
   k: KeyboardKey
   isShifted: boolean
   naturalWidth: boolean
   active: boolean
+  edge: PopupEdge
+  popupOpen: boolean
   onActivate: (key: KeyboardKey) => void
   onLongPress: (key: KeyboardKey) => void
+  onSelectVariant: (variant: string) => void
 }) {
   const hasVariants = isCharKey(k) && !!k.variants && k.variants.length > 0
   const handleLongPress = useCallback(() => onLongPress(k), [onLongPress, k])
@@ -84,56 +146,30 @@ function KeyButton({
     onActivate(k)
   }
 
+  // A célula é o item flex da fileira; o popup é ancorado nela (relative) → segue a coluna da tecla.
   return (
-    <button
-      type="button"
-      aria-label={ariaLabelFor(k)}
-      onClick={handleClick}
-      {...(hasVariants ? handlers : {})}
-      className={keyClassName(k, isShifted, naturalWidth, active)}
+    <div
+      className="relative flex"
       style={naturalWidth ? undefined : { flexGrow: k.widthUnits ?? 1, flexBasis: 0 }}
     >
-      {displayLabel(k, isShifted)}
-    </button>
-  )
-}
-
-function VariantPopup({
-  originKey,
-  isShifted,
-  onSelect,
-  onCancel,
-}: {
-  originKey: KeyboardKey
-  isShifted: boolean
-  onSelect: (variant: string) => void
-  onCancel: () => void
-}) {
-  const variants = originKey.variants ?? []
-  return (
-    <>
-      <div className="absolute inset-0 z-10" aria-hidden onClick={onCancel} />
-      <div
-        role="group"
-        aria-label={`Variantes de ${originKey.value ?? originKey.label}`}
-        className="absolute z-20 left-1/2 -translate-x-1/2 top-1 flex gap-1 rounded-2xl bg-white p-1.5 shadow-xl"
+      <button
+        type="button"
+        aria-label={ariaLabelFor(k)}
+        onClick={handleClick}
+        {...(hasVariants ? handlers : {})}
+        className={keyClassName(k, isShifted, naturalWidth, active)}
       >
-        {variants.map((v, i) => {
-          const shown = isShifted ? v.toUpperCase() : v
-          return (
-            <button
-              key={`v-${i}`}
-              type="button"
-              aria-label={shown}
-              onClick={() => onSelect(v)}
-              className="flex min-h-[52px] min-w-[48px] items-center justify-center rounded-xl text-2xl text-[#0A2472] transition-transform active:scale-95 active:bg-[#FCFC30] touch-manipulation"
-            >
-              {shown}
-            </button>
-          )
-        })}
-      </div>
-    </>
+        {displayLabel(k, isShifted)}
+      </button>
+      {popupOpen && (
+        <VariantBalloon
+          originKey={k}
+          isShifted={isShifted}
+          edge={edge}
+          onSelect={onSelectVariant}
+        />
+      )}
+    </div>
   )
 }
 
@@ -189,8 +225,11 @@ export function VirtualKeyboard({ layout, isShifted, onKey, visible }: VirtualKe
               isShifted={isShifted}
               naturalWidth={false}
               active={false}
+              edge="center"
+              popupOpen={false}
               onActivate={handleKey}
               onLongPress={setPopupKey}
+              onSelectVariant={selectVariant}
             />
           ))}
         </div>
@@ -204,18 +243,21 @@ export function VirtualKeyboard({ layout, isShifted, onKey, visible }: VirtualKe
               isShifted={isShifted}
               naturalWidth={naturalWidth}
               active={popupKey === k}
+              edge={edgeForIndex(i, row.length)}
+              popupOpen={popupKey === k}
               onActivate={handleKey}
               onLongPress={setPopupKey}
+              onSelectVariant={selectVariant}
             />
           ))}
         </div>
       ))}
+      {/* Backdrop: clicar/soltar fora do popup cancela sem inserir (z abaixo do balão). */}
       {popupKey && (
-        <VariantPopup
-          originKey={popupKey}
-          isShifted={isShifted}
-          onSelect={selectVariant}
-          onCancel={() => setPopupKey(null)}
+        <div
+          className="absolute inset-0 z-10"
+          aria-hidden
+          onClick={() => setPopupKey(null)}
         />
       )}
     </div>

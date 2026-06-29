@@ -123,10 +123,41 @@ describe('VirtualKeyboard — dialpad numérico centralizado (Cenário 9)', () =
     expect(digit.className).toContain('w-[84px]')
   })
 
-  it('alpha (align fill) usa flex-grow nas teclas (contraste)', () => {
+  it('alpha (align fill) usa flex-grow na célula da tecla (contraste)', () => {
     setup()
-    const letter = key('q') as HTMLButtonElement
-    expect(letter.style.flexGrow).not.toBe('')
+    const cell = key('q').parentElement as HTMLElement
+    expect(cell.style.flexGrow).not.toBe('')
+  })
+})
+
+describe('VirtualKeyboard — popup ancorado à tecla, com borda e clamp', () => {
+  it('o popup é filho da célula da tecla pressionada, tem borda contrastante e fica acima', () => {
+    setup()
+    fireEvent.pointerDown(key('a'))
+    act(() => vi.advanceTimersByTime(350))
+    const cell = key('a').parentElement as HTMLElement
+    const popup = within(cell).getByRole('group', { name: 'Variantes de a' })
+    expect(popup).toBeDefined()
+    expect(popup.className).toContain('border-2')
+    expect(popup.className).toContain('border-[#FCFC30]')
+    expect(popup.className).toContain('bottom-full')
+  })
+
+  it('clampa à esquerda numa tecla de borda (a) e centraliza no miolo (o)', () => {
+    setup()
+    fireEvent.pointerDown(key('a'))
+    act(() => vi.advanceTimersByTime(350))
+    const leftPopup = within(key('a').parentElement as HTMLElement).getByRole('group', {
+      name: 'Variantes de a',
+    })
+    expect(leftPopup.className).toContain('left-0')
+
+    fireEvent.pointerDown(key('e')) // miolo da fileira qwertyuiop (índice 2)
+    act(() => vi.advanceTimersByTime(350))
+    const centerPopup = within(key('e').parentElement as HTMLElement).getByRole('group', {
+      name: 'Variantes de e',
+    })
+    expect(centerPopup.className).toContain('-translate-x-1/2')
   })
 })
 
