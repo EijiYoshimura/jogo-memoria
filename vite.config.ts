@@ -50,6 +50,19 @@ export default defineConfig({
       navigateFallbackDenylist: [/^\/remoteEntry\.js$/, /\/api\//],
       runtimeCaching: [
         {
+          // config.json é buscado em runtime pelo ConfigLoader e guarda os
+          // paths das cartas. NetworkFirst: online pega a versão fresca
+          // (operador pode editar por evento); offline cai no último cache.
+          urlPattern: /\/config\.json$/,
+          handler: 'NetworkFirst',
+          options: {
+            cacheName: 'config-json',
+            networkTimeoutSeconds: 3,
+            expiration: { maxEntries: 1 },
+            cacheableResponse: { statuses: [0, 200] },
+          },
+        },
+        {
           // Supabase (sync de leads): nunca cachear chamadas de dados —
           // o leadsSync decide online/offline e o idb persiste localmente.
           urlPattern: /^https:\/\/[a-z0-9-]+\.supabase\.co\/.*/i,
