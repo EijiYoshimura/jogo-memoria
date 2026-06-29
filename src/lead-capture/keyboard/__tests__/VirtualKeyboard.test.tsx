@@ -5,6 +5,7 @@ import { LAYOUT_REGISTRY, type KeyboardKey } from '../keyboardLayouts'
 
 const ALPHA = LAYOUT_REGISTRY['alpha-ptbr']
 const NUMERIC = LAYOUT_REGISTRY['numeric']
+const EMAIL = LAYOUT_REGISTRY['email']
 
 function setup(opts: { isShifted?: boolean; layout?: typeof ALPHA } = {}) {
   const onKey = vi.fn()
@@ -112,6 +113,37 @@ describe('VirtualKeyboard — modo símbolos (Cenário 8)', () => {
     rerender(<VirtualKeyboard layout={ALPHA} isShifted={false} onKey={vi.fn()} visible />)
     expect(screen.getByRole('button', { name: 'Símbolos' })).toBeDefined()
     expect(screen.queryByRole('button', { name: 'Letras' })).toBeNull()
+  })
+})
+
+describe('VirtualKeyboard — layout de e-mail (HUB-85)', () => {
+  it('no modo alpha exibe a fileira numérica e a linha de domínios', () => {
+    setup({ layout: EMAIL })
+    for (const d of ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0']) {
+      expect(key(d)).toBeDefined()
+    }
+    expect(key('@gmail.com')).toBeDefined()
+    expect(key('@hotmail.com')).toBeDefined()
+    expect(key('@outlook.com')).toBeDefined()
+  })
+
+  it('inserir um domínio emite onKey com o value do atalho', () => {
+    const { onKey } = setup({ layout: EMAIL })
+    fireEvent.click(key('@gmail.com'))
+    expect(onKey).toHaveBeenCalledWith(expect.objectContaining({ value: '@gmail.com' }))
+  })
+
+  it('tocar em ?123 abre os símbolos e ABC volta ao e-mail (com a linha de domínios)', () => {
+    const { onKey } = setup({ layout: EMAIL })
+    fireEvent.click(key('Símbolos'))
+    expect(onKey).not.toHaveBeenCalled()
+    expect(key('#')).toBeDefined()
+    // no modo símbolos a linha de domínios fica oculta (SYMBOLS não tem shortcutsRow)
+    expect(screen.queryByRole('button', { name: '@gmail.com' })).toBeNull()
+    fireEvent.click(key('Letras'))
+    expect(key('@gmail.com')).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Símbolos' })).toBeDefined()
+    expect(onKey).not.toHaveBeenCalled()
   })
 })
 
