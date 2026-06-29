@@ -48,7 +48,7 @@ function onlyDigits(value: string): string {
 
 /** Insere dígito(s) na posição do caret sobre os dígitos crus do tel e reaplica a máscara. */
 function applyTelChar(input: ApplyKeyInput): ApplyKeyResult {
-  const { currentValue, key, isShifted } = input
+  const { currentValue, key } = input
   const caret = resolveCaret(input)
   const rawDigits = onlyDigits(currentValue)
   const rawCaret = maskedToRawIndex(currentValue, caret)
@@ -61,7 +61,8 @@ function applyTelChar(input: ApplyKeyInput): ApplyKeyResult {
   ).slice(0, MAX_PHONE_DIGITS)
   const newRawCaret = Math.min(rawCaret + insertedDigits.length, newDigits.length)
   const newMasked = applyPhoneMask(newDigits)
-  return { nextRaw: newDigits, nextShift: isShifted, nextCaret: rawToMaskedIndex(newMasked, newRawCaret) }
+  // Single-shot: inserir caractere consome o shift (nextShift: false).
+  return { nextRaw: newDigits, nextShift: false, nextCaret: rawToMaskedIndex(newMasked, newRawCaret) }
 }
 
 /** Remove o dígito cru à esquerda do caret no tel; no-op se não houver dígito à esquerda. */
@@ -89,22 +90,26 @@ function applyChar(input: ApplyKeyInput): ApplyKeyResult {
   const raw = key.value ?? ''
   const inserted = isShifted && raw.length === 1 ? raw.toUpperCase() : raw
 
+  // Single-shot: qualquer inserção de caractere consome o shift (nextShift: false).
+  // A maiúscula já foi aplicada acima quando isShifted; a próxima letra sai minúscula
+  // sem novo toque em SHIFT (Cenário 3 / auto-shift Cenário 7).
+
   // Atalhos de domínio (ex.: '@gmail.com') e a tecla '@' permanecem âncora-fim, com a
   // regra anti-`@@`: inserir um domínio "no meio" não faz sentido (decisão técnica 1).
   if (raw.startsWith('@') && currentValue.includes('@')) {
     const base = currentValue.slice(0, currentValue.indexOf('@'))
     const nextRaw = base + inserted
-    return { nextRaw, nextShift: isShifted, nextCaret: nextRaw.length }
+    return { nextRaw, nextShift: false, nextCaret: nextRaw.length }
   }
   if (inserted.length > 1) {
     const nextRaw = currentValue + inserted
-    return { nextRaw, nextShift: isShifted, nextCaret: nextRaw.length }
+    return { nextRaw, nextShift: false, nextCaret: nextRaw.length }
   }
 
   // Inserção de 1 caractere é caret-posicionada.
   const caret = resolveCaret(input)
   const nextRaw = currentValue.slice(0, caret) + inserted + currentValue.slice(caret)
-  return { nextRaw, nextShift: isShifted, nextCaret: caret + inserted.length }
+  return { nextRaw, nextShift: false, nextCaret: caret + inserted.length }
 }
 
 function applyBackspace(input: ApplyKeyInput): ApplyKeyResult {
