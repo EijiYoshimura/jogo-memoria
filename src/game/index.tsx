@@ -59,7 +59,7 @@ export function MemoryGame({ config, onComplete }: MemoryGameProps) {
 
   return (
     <div
-      className="flex flex-col h-full w-full px-[8%] pt-[8%] gap-5"
+      className="flex flex-col h-full w-full overflow-hidden rounded-[2.25rem] border-8 border-white px-[6%] pt-[7%] pb-[4%]"
       style={{ backgroundColor: config.event.backgroundColor }}
     >
       <div className="flex flex-col items-center gap-2">
@@ -78,13 +78,15 @@ export function MemoryGame({ config, onComplete }: MemoryGameProps) {
           />
         )}
       </div>
-      <div className="flex-1 min-h-0">
-        <Board
-          cards={session.cards}
-          cardBack={config.game.cardBack}
-          onCardClick={handleCardClick}
-        />
-      </div>
+      {/* Espaçadores em razão 3:8 ancoram o grid na faixa ~20%–84% da altura,
+          deixando mais respiro abaixo (reservado ao futuro botão COMEÇAR). */}
+      <div aria-hidden className="grow-[3]" />
+      <Board
+        cards={session.cards}
+        cardBack={config.game.cardBack}
+        onCardClick={handleCardClick}
+      />
+      <div aria-hidden className="grow-[8]" />
     </div>
   )
 }
