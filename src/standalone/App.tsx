@@ -6,6 +6,7 @@ import { MemoryGame } from '../game/index'
 import { ResultScreen } from './ResultScreen'
 import { AdminPanel } from './AdminPanel'
 import { useLeadPersistence } from './hooks/useLeadPersistence'
+import { useKioskMode } from './hooks/useKioskMode'
 import { DEFAULT_CONSENT_VERSION } from './lib/lgpd'
 
 type AppScreen = 'splash' | 'lead-form' | 'game' | 'result' | 'admin'
@@ -18,6 +19,7 @@ interface GameResult {
 export function App() {
   const config = useConfig()
   const { saveLead } = useLeadPersistence()
+  useKioskMode()
 
   const [screen, setScreen] = useState<AppScreen>('splash')
   const [leadData, setLeadData] = useState<Record<string, string>>({})

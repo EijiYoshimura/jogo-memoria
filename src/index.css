@@ -38,11 +38,37 @@ html, body, #root {
   margin: 0;
   padding: 0;
   overflow: hidden;
+  /* Kiosk (HUB-82): sem pull-to-refresh nem rubber-band/overscroll no totem. */
+  overscroll-behavior: none;
 }
 
 body {
   font-family: system-ui, -apple-system, sans-serif;
+  /* Kiosk (HUB-82): sem zoom por duplo-toque; toque imediato. */
   touch-action: manipulation;
+  /* Kiosk (HUB-82): sem seleção de texto, callout (long-press) nem arraste
+     acidentais. Os inputs reabilitam a seleção logo abaixo para preservar o
+     caret e a digitação (HUB-69/78). */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Inputs/campos editáveis preservam seleção e caret — o bloqueio do shell não
+   pode afetar a digitação do teclado virtual (HUB-69/78). */
+input,
+textarea,
+[contenteditable] {
+  user-select: text;
+  -webkit-user-select: text;
+  -webkit-touch-callout: default;
+}
+
+/* Kiosk (HUB-82): imagens (cartas, logos) não podem ser arrastadas. */
+img {
+  -webkit-user-drag: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 /* Caret customizado do teclado virtual (HUB-78) — pisca via CSS, sem JS timer. */
