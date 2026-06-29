@@ -59,7 +59,7 @@ export function MemoryGame({ config, onComplete }: MemoryGameProps) {
 
   return (
     <div
-      className="flex flex-col h-full w-full overflow-hidden rounded-[2.25rem] border-8 border-white px-[6%] pt-[7%] pb-[4%]"
+      className="flex flex-col h-full w-full overflow-hidden rounded-[2.25rem] border-8 border-white px-[4%] pt-[7%] pb-[4%]"
       style={{ backgroundColor: config.event.backgroundColor }}
     >
       <div className="flex flex-col items-center gap-2">

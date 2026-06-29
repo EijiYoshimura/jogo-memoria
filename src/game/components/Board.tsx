@@ -9,7 +9,7 @@ interface BoardProps {
 
 export function Board({ cards, cardBack, onCardClick }: BoardProps) {
   return (
-    <div className="grid grid-cols-3 gap-4 w-full">
+    <div className="grid grid-cols-3 gap-3 w-full">
       {cards.map((card) => (
         <Card
           key={card.id}
