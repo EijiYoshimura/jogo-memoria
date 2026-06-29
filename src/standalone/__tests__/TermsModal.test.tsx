@@ -18,10 +18,13 @@ const baseConfig: GameConfig = {
   lgpd: {
     consentVersion: '1.0',
     dataController: 'Evento Demo Ltda',
-    purposeText: 'para que possamos entrar em contato com novidades e promoções',
+    // Após HUB-77: purposeText carrega a POLÍTICA DE PRIVACIDADE completa.
+    purposeText:
+      'POLÍTICA DE PRIVACIDADE\n1. DOS DADOS COLETADOS\nColetamos nome, e-mail e telefone.',
     retentionMonths: 12,
+    // Após HUB-77: consentText carrega os TERMOS DE USO completos.
     consentText:
-      'Eu concordo com a coleta e uso dos meus dados pessoais para fins de marketing, conforme descrito na Política de Privacidade.',
+      'TERMOS E CONDIÇÕES DE USO\nCLÁUSULA PRIMEIRA\nO participante adere a estas condições.',
   },
 }
 
@@ -37,11 +40,13 @@ afterEach(() => {
 })
 
 describe('TermsModal', () => {
-  it('renderiza como dialog acessível com título', () => {
+  it('renderiza como dialog acessível com o título do modal', () => {
     render(<TermsModal config={baseConfig} onClose={vi.fn()} />)
     const dialog = screen.getByRole('dialog')
     expect(dialog.getAttribute('aria-modal')).toBe('true')
-    expect(screen.getByRole('heading', { name: 'Termos de consentimento' })).toBeDefined()
+    expect(
+      screen.getByRole('heading', { name: 'Termos de uso e política de privacidade' })
+    ).toBeDefined()
   })
 
   it('aplica 80% de largura no card (w-[80%] max-w-none, sem max-w-md)', () => {
@@ -53,22 +58,30 @@ describe('TermsModal', () => {
     expect(dialog.className).toContain('max-h-[80vh]')
   })
 
-  it('exibe o consentText custom no corpo', () => {
+  it('exibe o bloco "Termos de Uso" com o consentText', () => {
     render(<TermsModal config={baseConfig} onClose={vi.fn()} />)
-    expect(screen.getByText(/Eu concordo com a coleta e uso dos meus dados/i)).toBeDefined()
+    const heading = screen.getByRole('heading', { name: 'Termos de Uso' })
+    expect(heading).toBeDefined()
+    expect(screen.getByText(/O participante adere a estas condições/i)).toBeDefined()
   })
 
-  it('exibe o bloco de Finalidade com o purposeText, separado por divisória', () => {
+  it('exibe o bloco "Política de Privacidade" com o purposeText, separado por divisória', () => {
     render(<TermsModal config={baseConfig} onClose={vi.fn()} />)
-    const heading = screen.getByRole('heading', { name: 'Finalidade do uso dos dados' })
+    const heading = screen.getByRole('heading', { name: 'Política de Privacidade' })
     expect(heading).toBeDefined()
-    expect(
-      screen.getByText('para que possamos entrar em contato com novidades e promoções')
-    ).toBeDefined()
-    // separado visualmente: a divisória vive no container do bloco de finalidade
+    expect(screen.getByText(/Coletamos nome, e-mail e telefone/i)).toBeDefined()
+    // separado visualmente: a divisória vive no container do bloco da política
     const block = heading.parentElement
     expect(block?.className).toContain('border-t')
     expect(block?.className).toContain('pt-4')
+  })
+
+  it('renderiza os dois blocos com os textos nos rótulos corretos', () => {
+    render(<TermsModal config={baseConfig} onClose={vi.fn()} />)
+    expect(screen.getByRole('heading', { name: 'Termos de Uso' })).toBeDefined()
+    expect(screen.getByRole('heading', { name: 'Política de Privacidade' })).toBeDefined()
+    expect(screen.getByText(/CLÁUSULA PRIMEIRA/i)).toBeDefined()
+    expect(screen.getByText(/DOS DADOS COLETADOS/i)).toBeDefined()
   })
 
   it('usa o purposeText default quando ausente no config', () => {

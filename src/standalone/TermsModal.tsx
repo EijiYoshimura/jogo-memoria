@@ -112,13 +112,22 @@ export function TermsModal({ config, onClose }: TermsModalProps) {
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 font-bb-textos text-gray-800 text-base leading-relaxed">
-          <p style={{ whiteSpace: 'pre-line' }}>{consentText}</p>
+          <div>
+            <h3 className="font-bb-titulos font-bold text-[#0333BD] text-sm">
+              Termos de Uso
+            </h3>
+            <p className="mt-1" style={{ whiteSpace: 'pre-line' }}>
+              {consentText}
+            </p>
+          </div>
 
           <div className="mt-4 pt-4 border-t border-gray-200">
             <h3 className="font-bb-titulos font-bold text-[#0333BD] text-sm">
-              Finalidade do uso dos dados
+              Política de Privacidade
             </h3>
-            <p className="mt-1 font-bb-textos">{purposeText}</p>
+            <p className="mt-1" style={{ whiteSpace: 'pre-line' }}>
+              {purposeText}
+            </p>
           </div>
 
           {privacyPolicyPath ? (
