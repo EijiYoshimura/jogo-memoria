@@ -72,18 +72,20 @@ describe('LeadForm — modo LIGADO (virtualKeyboard.enabled: true)', () => {
     expect(screen.getByRole('group', { name: 'Teclado virtual' })).toBeDefined()
   })
 
-  it('digita pelo teclado virtual atualizando o campo ativo', () => {
+  it('digita pelo teclado virtual atualizando o campo ativo (auto-shift capitaliza a 1ª — HUB-71)', () => {
     render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
     fireEvent.click(input('name'))
-    fireEvent.click(vkey('j'))
+    // name vazio → auto-shift arma a 1ª letra maiúscula (a tecla exibe 'J').
+    fireEvent.click(vkey('J'))
     fireEvent.click(vkey('o'))
-    expect(input('name').value).toBe('jo')
+    expect(input('name').value).toBe('Jo')
   })
 
   it('troca o layout pelo tipo do campo e preserva valores (Cenários 5 e 8)', () => {
     render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
     fireEvent.click(input('name'))
-    fireEvent.click(vkey('a'))
+    // name vazio → auto-shift: 1ª letra maiúscula (tecla 'A').
+    fireEvent.click(vkey('A'))
     // troca para o campo phone → layout numérico (tecla '1' existe; 'a' não)
     fireEvent.click(input('phone'))
     expect(vkey('1')).toBeDefined()
@@ -94,7 +96,7 @@ describe('LeadForm — modo LIGADO (virtualKeyboard.enabled: true)', () => {
     ).toBeNull()
     // valor do name preservado ao voltar
     fireEvent.click(input('name'))
-    expect(input('name').value).toBe('a')
+    expect(input('name').value).toBe('A')
   })
 
   it('aplica a máscara de telefone ao digitar pelo teclado virtual e ignora >11 dígitos (Cenário 5)', () => {
@@ -118,24 +120,27 @@ describe('LeadForm — modo LIGADO (virtualKeyboard.enabled: true)', () => {
 })
 
 describe('LeadForm — edição com caret (HUB-69)', () => {
+  // Digita no campo name. O auto-shift (HUB-71) capitaliza a 1ª letra do nome vazio, então a
+  // 1ª tecla é exibida em maiúscula; as demais saem minúsculas (single-shot). Resultado: a
+  // string com a inicial maiúscula. O foco aqui é a posição do caret, não a capitalização.
   function typeName(text: string) {
     fireEvent.click(input('name'))
-    for (const c of text) fireEvent.click(vkey(c))
+    text.split('').forEach((c, i) => fireEvent.click(vkey(i === 0 ? c.toUpperCase() : c)))
   }
 
   it('reposiciona o caret ao fim após digitar pelo teclado virtual (Cenário 7)', () => {
     render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
     typeName('maria')
-    expect(input('name').value).toBe('maria')
+    expect(input('name').value).toBe('Maria')
     expect(input('name').selectionStart).toBe(5)
   })
 
   it('toque posiciona o caret e a tecla insere no meio, avançando 1 (Cenários 2/3)', () => {
     render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
     typeName('maria')
-    input('name').setSelectionRange(3, 3) // toque entre 'mar' e 'ia'
+    input('name').setSelectionRange(3, 3) // toque entre 'Mar' e 'ia'
     fireEvent.click(vkey('x'))
-    expect(input('name').value).toBe('marxia')
+    expect(input('name').value).toBe('Marxia')
     expect(input('name').selectionStart).toBe(4)
   })
 
@@ -144,7 +149,7 @@ describe('LeadForm — edição com caret (HUB-69)', () => {
     typeName('maria')
     input('name').setSelectionRange(3, 3)
     fireEvent.click(vkey('Apagar'))
-    expect(input('name').value).toBe('maia')
+    expect(input('name').value).toBe('Maia')
     expect(input('name').selectionStart).toBe(2)
   })
 
@@ -153,7 +158,7 @@ describe('LeadForm — edição com caret (HUB-69)', () => {
     typeName('maria')
     input('name').setSelectionRange(0, 0)
     fireEvent.click(vkey('Apagar'))
-    expect(input('name').value).toBe('maria')
+    expect(input('name').value).toBe('Maria')
     expect(input('name').selectionStart).toBe(0)
   })
 
@@ -201,6 +206,58 @@ describe('LeadForm — edição com caret (HUB-69)', () => {
     fireEvent.click(input('name')) // ativo, mas vazio e obrigatório
     fireEvent.click(screen.getByRole('button', { name: 'ENVIAR' }))
     expect(input('name').style.borderColor).toBe('rgb(239, 68, 68)')
+  })
+})
+
+describe('LeadForm — SHIFT e auto-shift (HUB-71)', () => {
+  // A tecla SHIFT tem aria-label 'Maiúscula'. Com shift ligado, as teclas de letra exibem
+  // a versão maiúscula (o texto da tecla é o accessible name).
+  const SHIFT_LABEL = 'Maiúscula'
+
+  it('SHIFT + letra produz maiúscula e não é zerado pelo re-foco do mesmo campo (Cenários 1/2)', () => {
+    render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
+    // email não recebe auto-shift → isola o comportamento da tecla SHIFT.
+    fireEvent.click(input('email'))
+    fireEvent.click(vkey(SHIFT_LABEL)) // liga o shift; o re-foco do caret NÃO pode zerá-lo
+    fireEvent.click(vkey('A')) // shift on → a tecla 'a' aparece como 'A'
+    expect(input('email').value).toBe('A')
+  })
+
+  it('shift é single-shot: a letra seguinte (sem novo SHIFT) sai minúscula (Cenário 3)', () => {
+    render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
+    fireEvent.click(input('email'))
+    fireEvent.click(vkey(SHIFT_LABEL))
+    fireEvent.click(vkey('A'))
+    fireEvent.click(vkey('b')) // shift consumido → minúscula
+    expect(input('email').value).toBe('Ab')
+  })
+
+  it('auto-shift: campo name vazio inicia a 1ª letra maiúscula e a 2ª minúscula (Cenários 6/7)', () => {
+    render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
+    fireEvent.click(input('name')) // name vazio → auto-shift arma o shift
+    fireEvent.click(vkey('M')) // 1ª letra maiúscula
+    fireEvent.click(vkey('a')) // single-shot → minúscula
+    expect(input('name').value).toBe('Ma')
+  })
+
+  it('auto-shift NÃO dispara em name já preenchido — letra sai minúscula (Cenário 8)', () => {
+    render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
+    fireEvent.click(input('name'))
+    fireEvent.click(vkey('M'))
+    fireEvent.click(vkey('a')) // name = 'Ma'
+    fireEvent.click(input('email')) // sai do name
+    fireEvent.click(input('name')) // volta ao name JÁ preenchido → sem auto-shift
+    input('name').setSelectionRange(2, 2)
+    fireEvent.click(vkey('r')) // sem shift → minúscula (se houvesse auto-shift, seria 'R')
+    expect(input('name').value).toBe('Mar')
+  })
+
+  it('trocar de campo reseta o shift (Cenário 9)', () => {
+    render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
+    fireEvent.click(input('name')) // auto-shift liga o shift
+    fireEvent.click(input('email')) // troca de campo → reset do shift
+    fireEvent.click(vkey('a')) // shift resetado → minúscula
+    expect(input('email').value).toBe('a')
   })
 })
 

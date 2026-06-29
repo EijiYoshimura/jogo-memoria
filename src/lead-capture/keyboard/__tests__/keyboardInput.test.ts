@@ -53,8 +53,23 @@ describe('applyKey — char', () => {
     expect(call('', char('ã'), { isShifted: true }).nextRaw).toBe('Ã')
   })
 
-  it('mantém o shift (toggle) após inserir caractere', () => {
-    expect(call('a', char('b'), { isShifted: true }).nextShift).toBe(true)
+  it('consome o shift (single-shot) após inserir caractere com shift ligado (Cenário 3)', () => {
+    const r = call('a', char('b'), { isShifted: true })
+    expect(r.nextRaw).toBe('aB') // a letra sai maiúscula
+    expect(r.nextShift).toBe(false) // e o shift desliga (próxima letra minúscula)
+  })
+
+  it('char sem shift mantém o shift desligado', () => {
+    expect(call('a', char('b'), { isShifted: false }).nextShift).toBe(false)
+  })
+
+  it('atalho de domínio e tecla @ também consomem o shift (single-shot)', () => {
+    expect(call('joao', char('@gmail.com'), { isShifted: true }).nextShift).toBe(false)
+    expect(call('joao@x', char('@'), { isShifted: true }).nextShift).toBe(false)
+  })
+
+  it('inserir dígito no tel consome o shift (single-shot)', () => {
+    expect(call('(11) 9', char('8'), { ...tel(), isShifted: true }).nextShift).toBe(false)
   })
 })
 
@@ -93,6 +108,12 @@ describe('applyKey — clear / space', () => {
 
   it('space anexa um espaço', () => {
     expect(call('maria', SPACE).nextRaw).toBe('maria ')
+  })
+
+  it('space/backspace/clear preservam o shift (não forçam nem consomem caps)', () => {
+    expect(call('maria', SPACE, { isShifted: true }).nextShift).toBe(true)
+    expect(call('maria', BACKSPACE, { isShifted: true }).nextShift).toBe(true)
+    expect(call('maria', CLEAR, { isShifted: true }).nextShift).toBe(true)
   })
 })
 

@@ -21,6 +21,8 @@ const ACTIVE_BORDER_COLOR = '#0333BD'
 const ACTIVE_RING_SHADOW = '0 0 0 4px rgba(3, 51, 189, 0.35)'
 const ERROR_RING_SHADOW = '0 0 0 4px rgba(239, 68, 68, 0.35)'
 const CONSENT_REQUIRED_MESSAGE = 'É necessário aceitar os termos para participar'
+// Campo que recebe auto-shift (1ª letra maiúscula) ao ser ativado vazio (decisão PO 1).
+const AUTO_SHIFT_FIELD_ID = 'name'
 
 // Teclas de navegação/controle permitidas sob VK (não mutam o valor do campo).
 const NAVIGATION_KEYS = new Set([
@@ -80,6 +82,18 @@ export function LeadForm({ config, onSubmit }: LeadFormProps) {
     () => (activeField ? resolveLayout(activeField) : null),
     [activeField]
   )
+
+  // Ativa um campo (compartilhado por onFocus/onClick). Ao ATIVAR (id muda) o campo `name`
+  // vazio, arma o shift para a 1ª letra sair maiúscula (auto-shift). A regra de form fica
+  // aqui, não vaza para o hook genérico. O guard `isActivating` evita re-armar no re-foco do
+  // mesmo campo já ativo (Cenário 8) e no re-foco do reposicionamento de caret (HUB-69).
+  function activateField(fieldId: string) {
+    const isActivating = fieldId !== activeFieldId
+    setActiveField(fieldId)
+    if (isActivating && fieldId === AUTO_SHIFT_FIELD_ID && (values[fieldId] ?? '') === '') {
+      setShift(true)
+    }
+  }
 
   function handleChange(fieldId: string, fieldType: string, hasMask: boolean, raw: string) {
     const value = hasMask && fieldType === 'tel' ? applyPhoneMask(raw) : raw
@@ -219,8 +233,8 @@ export function LeadForm({ config, onSubmit }: LeadFormProps) {
                       ? {
                           // Editável (sem readOnly) para o caret/toque funcionarem, mas a
                           // digitação nativa é bloqueada — só o VK muta o valor.
-                          onClick: () => setActiveField(field.id),
-                          onFocus: () => setActiveField(field.id),
+                          onClick: () => activateField(field.id),
+                          onFocus: () => activateField(field.id),
                           onKeyDown: blockNativeTextKey,
                           onBeforeInput: blockNativeMutation,
                           onPaste: blockNativeMutation,
