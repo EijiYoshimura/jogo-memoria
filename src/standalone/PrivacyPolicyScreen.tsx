@@ -7,7 +7,7 @@ interface PrivacyPolicyScreenProps {
   primaryColor: string
   /** Cor de fundo do evento, aplicada ao cabeçalho e à moldura. */
   backgroundColor: string
-  /** Fecha a tela e retorna à tela de consentimento. */
+  /** Fecha a tela e retorna à origem (modal de termos / formulário). */
   onBack: () => void
 }
 
@@ -48,7 +48,7 @@ export function PrivacyPolicyScreen({
           type="button"
           onClick={onBack}
           style={backButtonStyle}
-          aria-label="Voltar para a tela de consentimento"
+          aria-label="Voltar"
         >
           ← Voltar
         </button>

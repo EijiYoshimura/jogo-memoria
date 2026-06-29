@@ -7,6 +7,7 @@ import {
   VirtualKeyboard,
   type KeyboardKey,
 } from '../lead-capture/keyboard'
+import { TermsModal } from './TermsModal'
 
 interface LeadFormProps {
   config: GameConfig
@@ -15,6 +16,12 @@ interface LeadFormProps {
 
 const DEFAULT_ACCENT_COLOR = '#FCFC30'
 const ERROR_BORDER_COLOR = '#EF4444'
+const CONSENT_REQUIRED_MESSAGE = 'É necessário aceitar os termos para participar'
+
+/** Esmaece um accent em hex 6 dígitos (40% alpha) para o estado desabilitado do botão. */
+function dimmedAccent(hex: string): string {
+  return /^#[0-9a-fA-F]{6}$/.test(hex) ? `${hex}66` : hex
+}
 
 function applyPhoneMask(value: string): string {
   const digits = value.replace(/\D/g, '').slice(0, 11)
@@ -28,6 +35,9 @@ export function LeadForm({ config, onSubmit }: LeadFormProps) {
     Object.fromEntries(config.leadForm.fields.map((f) => [f.id, '']))
   )
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [accepted, setAccepted] = useState(false)
+  const [consentError, setConsentError] = useState('')
+  const [showTerms, setShowTerms] = useState(false)
 
   const vkEnabled = config.leadForm.virtualKeyboard?.enabled ?? false
   const accent = config.event.accentColor ?? DEFAULT_ACCENT_COLOR
@@ -77,11 +87,19 @@ export function LeadForm({ config, onSubmit }: LeadFormProps) {
     return Object.keys(newErrors).length === 0
   }
 
+  function handleAcceptedChange(next: boolean) {
+    setAccepted(next)
+    if (next) setConsentError('')
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (validate()) {
-      onSubmit(values)
-    }
+    // Gating em dupla camada e independente: validação de campos E consentimento.
+    const fieldsOk = validate()
+    const consentOk = accepted
+    if (!consentOk) setConsentError(CONSENT_REQUIRED_MESSAGE)
+    if (!fieldsOk || !consentOk) return
+    onSubmit(values)
   }
 
   return (
@@ -156,10 +174,59 @@ export function LeadForm({ config, onSubmit }: LeadFormProps) {
                 </div>
               )
             })}
+            <div className="flex flex-col gap-2">
+              <label className="flex items-start gap-3 min-h-[44px] cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="peer sr-only"
+                  checked={accepted}
+                  onChange={(e) => handleAcceptedChange(e.target.checked)}
+                  aria-describedby={consentError ? 'consent-error' : undefined}
+                  aria-invalid={consentError ? true : undefined}
+                />
+                <span
+                  aria-hidden
+                  className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-2 peer-focus-visible:ring-2 peer-focus-visible:ring-[#FCFC30] peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-[#0333BD] ${
+                    consentError
+                      ? 'border-[#FFC7C7]'
+                      : 'border-white peer-checked:border-[#FCFC30]'
+                  } ${accepted ? 'bg-[#FCFC30]' : 'bg-transparent'}`}
+                >
+                  {accepted && (
+                    <span className="text-[#0333BD] text-lg font-bold leading-none">✓</span>
+                  )}
+                </span>
+                <span className="font-bb-textos text-white text-base leading-snug">
+                  Li e aceito os{' '}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setShowTerms(true)
+                    }}
+                    className="underline text-[#FCFC30] font-medium"
+                  >
+                    termos de consentimento
+                  </button>{' '}
+                  e a Política de Privacidade.
+                </span>
+              </label>
+              {consentError && (
+                <span
+                  id="consent-error"
+                  aria-live="polite"
+                  className="text-[#FFC7C7] font-bb-textos text-base"
+                >
+                  {consentError}
+                </span>
+              )}
+            </div>
             <button
               type="submit"
-              className="mt-8 mx-auto w-[38%] rounded-full border-4 border-white text-[#0333BD] font-bb-titulos font-extrabold uppercase text-xl min-h-[56px] px-6 transition-opacity active:opacity-80"
-              style={{ backgroundColor: accent }}
+              disabled={!accepted}
+              aria-disabled={!accepted}
+              className="mt-8 mx-auto w-[38%] rounded-full border-4 border-white text-[#0333BD] font-bb-titulos font-extrabold uppercase text-xl min-h-[56px] px-6 transition-opacity active:opacity-80 disabled:cursor-not-allowed disabled:text-[#0333BD]/50"
+              style={{ backgroundColor: accepted ? accent : dimmedAccent(accent) }}
             >
               ENVIAR
             </button>
@@ -174,6 +241,7 @@ export function LeadForm({ config, onSubmit }: LeadFormProps) {
           visible={!!activeFieldId}
         />
       )}
+      {showTerms && <TermsModal config={config} onClose={() => setShowTerms(false)} />}
     </div>
   )
 }
