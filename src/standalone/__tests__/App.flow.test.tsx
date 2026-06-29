@@ -30,12 +30,12 @@ import { App } from '../App'
 describe('App — fluxo direto splash → lead-form (HUB-67, Cenários 1/9)', () => {
   it('da splash vai direto ao formulário, sem tela de consentimento', () => {
     render(<App />)
-    expect(screen.getByText('Toque para jogar')).toBeDefined()
+    expect(screen.getByRole('button', { name: 'TOQUE PARA JOGAR' })).toBeDefined()
     // não existe mais a ConsentScreen no caminho
     expect(screen.queryByText(/Participar e aceitar/i)).toBeNull()
     expect(screen.queryByText(/Jogar sem participar/i)).toBeNull()
 
-    fireEvent.click(screen.getByText('Toque para jogar'))
+    fireEvent.click(screen.getByRole('button', { name: 'TOQUE PARA JOGAR' }))
 
     // formulário renderizado em seguida (logo BB + checkbox de consentimento)
     expect(screen.getByAltText('BB Seguros')).toBeDefined()
