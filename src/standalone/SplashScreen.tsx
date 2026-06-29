@@ -7,8 +7,12 @@ interface SplashScreenProps {
   onAdminAccess: () => void
 }
 
+const DEFAULT_ACCENT_COLOR = '#FCFC30'
+const CTA_TEXT_COLOR = '#0333BD'
+
 export function SplashScreen({ config, onStart, onAdminAccess }: SplashScreenProps) {
   const logoTapsRef = useRef<number[]>([])
+  const accent = config.event.accentColor ?? DEFAULT_ACCENT_COLOR
 
   const handleLogoTap = useCallback(
     (e: React.MouseEvent | React.TouchEvent) => {
@@ -26,38 +30,30 @@ export function SplashScreen({ config, onStart, onAdminAccess }: SplashScreenPro
 
   return (
     <div
-      className="flex flex-col items-center justify-center h-full w-full cursor-pointer select-none"
+      className="flex flex-col items-center justify-center h-full w-full select-none"
       style={{ backgroundColor: config.event.backgroundColor }}
-      onClick={onStart}
     >
-      <div
-        className="flex flex-col items-center gap-6"
-        onClick={handleLogoTap}
-      >
+      <div className="flex flex-col items-center gap-6 w-full" onClick={handleLogoTap}>
         <img
           src={config.event.logo}
           alt={config.event.name}
-          className="w-48 h-48 object-contain"
+          className="w-[75%] object-contain"
           draggable={false}
           onError={(e) => {
             const target = e.currentTarget
             target.style.display = 'none'
           }}
         />
-        <h1
-          className="text-5xl font-bold text-center"
-          style={{ color: config.event.primaryColor }}
-        >
-          {config.event.name}
-        </h1>
       </div>
 
-      <p
-        className="mt-16 text-2xl font-medium animate-pulse"
-        style={{ color: config.event.primaryColor }}
+      <button
+        type="button"
+        onClick={onStart}
+        className="mt-16 rounded-full border-4 border-white font-bb-titulos font-extrabold uppercase text-2xl min-h-[56px] px-10 transition-opacity active:opacity-80"
+        style={{ backgroundColor: accent, color: CTA_TEXT_COLOR }}
       >
-        Toque para jogar
-      </p>
+        TOQUE PARA JOGAR
+      </button>
     </div>
   )
 }
