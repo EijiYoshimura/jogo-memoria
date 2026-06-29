@@ -50,4 +50,27 @@ describe('SplashScreen (HUB-70)', () => {
 
     expect(onStart).not.toHaveBeenCalled()
   })
+
+  it('HUB-61: renderiza a imagem com logo http(s) seguro', () => {
+    const safeConfig = {
+      ...config,
+      event: { ...config.event, logo: 'https://exemplo.com/logo.png' },
+    } as unknown as GameConfig
+    render(<SplashScreen config={safeConfig} onStart={vi.fn()} onAdminAccess={vi.fn()} />)
+
+    const img = screen.getByAltText('Evento Demo')
+    expect(img.getAttribute('src')).toBe('https://exemplo.com/logo.png')
+  })
+
+  it('HUB-61: NÃO renderiza a imagem com logo de esquema perigoso (anti-XSS)', () => {
+    const dangerousConfig = {
+      ...config,
+      event: { ...config.event, logo: 'javascript:alert(1)' },
+    } as unknown as GameConfig
+    render(
+      <SplashScreen config={dangerousConfig} onStart={vi.fn()} onAdminAccess={vi.fn()} />
+    )
+
+    expect(screen.queryByAltText('Evento Demo')).toBeNull()
+  })
 })
