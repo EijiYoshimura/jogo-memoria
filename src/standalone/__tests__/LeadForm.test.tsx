@@ -35,33 +35,28 @@ const consentCheckbox = () => screen.getByRole('checkbox')
 const acceptConsent = () => fireEvent.click(consentCheckbox())
 
 describe('LeadForm — modo LIGADO (virtualKeyboard.enabled: true)', () => {
-  it('sob VK os inputs são editáveis (sem readOnly, p/ caret) com inputMode none (Cenário 1)', () => {
+  it('sob VK os inputs são readOnly (suprime teclado nativo Android), sem inputMode (HUB-78)', () => {
     render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
     for (const id of ['name', 'email', 'phone']) {
-      // Editável para o caret piscar e o toque posicionar; readOnly não renderiza caret.
-      expect(input(id).readOnly).toBe(false)
-      // inputMode none segue suprimindo o teclado nativo do dispositivo.
-      expect(input(id).getAttribute('inputmode')).toBe('none')
+      // readOnly suprime o teclado nativo de forma confiável e continua focável.
+      expect(input(id).readOnly).toBe(true)
+      // sem inputMode none (que era inconsistente no Android); readOnly já basta.
+      expect(input(id).getAttribute('inputmode')).toBeNull()
     }
   })
 
-  it('bloqueia a digitação nativa sob VK (só o teclado virtual muta o valor)', () => {
+  it('readOnly bloqueia mutação nativa; só o teclado virtual muta o valor (HUB-78)', () => {
     render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
     fireEvent.click(input('name'))
-    // fireEvent retorna false quando o handler chamou preventDefault.
-    expect(fireEvent.keyDown(input('name'), { key: 'a' })).toBe(false)
-    expect(fireEvent.keyDown(input('name'), { key: 'Backspace' })).toBe(false)
-    expect(fireEvent.keyDown(input('name'), { key: 'Delete' })).toBe(false)
-    expect(fireEvent.keyDown(input('name'), { key: 'Enter' })).toBe(false)
-    // navegação/seleção continuam permitidas (para posicionar o caret).
-    expect(fireEvent.keyDown(input('name'), { key: 'ArrowLeft' })).toBe(true)
-    expect(fireEvent.keyDown(input('name'), { key: 'Home' })).toBe(true)
-    // colar não altera o valor.
-    expect(fireEvent.paste(input('name'))).toBe(false)
+    // sem o caret-color nativo: o caret é o CaretOverlay customizado.
+    expect(input('name').className).not.toContain('caret-[#0333BD]')
+    // readOnly garante que a digitação nativa não altera o valor.
+    expect(input('name').readOnly).toBe(true)
   })
 
-  it('sem VK não bloqueia a digitação nativa (paridade atual)', () => {
+  it('sem VK os inputs não são readOnly (teclado nativo, paridade atual)', () => {
     render(<LeadForm config={makeConfig(undefined)} onSubmit={vi.fn()} />)
+    expect(input('name').readOnly).toBe(false)
     expect(fireEvent.keyDown(input('name'), { key: 'a' })).toBe(true)
   })
 
@@ -128,61 +123,86 @@ describe('LeadForm — edição com caret (HUB-69)', () => {
     text.split('').forEach((c, i) => fireEvent.click(vkey(i === 0 ? c.toUpperCase() : c)))
   }
 
-  it('reposiciona o caret ao fim após digitar pelo teclado virtual (Cenário 7)', () => {
-    render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
+  // Caret customizado (HUB-78): o estado vive em React (caretPos) e é renderizado pelo
+  // CaretOverlay, não mais via selectionStart nativo. Medidor determinístico (10px/char)
+  // e origem do conteúdo (borda 4px + padding 20px) tornam a posição do caret verificável.
+  const FAKE_MEASURE = (text: string) => text.length * 10
+  const CONTENT_LEFT_OFFSET = 24
+  const renderVK = () =>
+    render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} measureText={FAKE_MEASURE} />)
+  const caret = () => document.querySelector('[data-testid="vk-caret"]') as HTMLElement | null
+  const caretLeft = () => caret()?.style.left ?? null
+  // Toque-para-posicionar: converte o índice-alvo em clientX (rect.left e scroll = 0 no jsdom).
+  const tapCaret = (id: string, index: number) =>
+    fireEvent.pointerDown(input(id), { clientX: CONTENT_LEFT_OFFSET + index * 10 })
+
+  it('posiciona o caret customizado ao fim após digitar pelo teclado virtual (Cenário 7)', () => {
+    renderVK()
     typeName('maria')
     expect(input('name').value).toBe('Maria')
-    expect(input('name').selectionStart).toBe(5)
+    // caret ao fim: 24 (origem) + 5 chars × 10px.
+    expect(caretLeft()).toBe('74px')
   })
 
   it('toque posiciona o caret e a tecla insere no meio, avançando 1 (Cenários 2/3)', () => {
-    render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
+    renderVK()
     typeName('maria')
-    input('name').setSelectionRange(3, 3) // toque entre 'Mar' e 'ia'
+    tapCaret('name', 3) // toque entre 'Mar' e 'ia'
     fireEvent.click(vkey('x'))
     expect(input('name').value).toBe('Marxia')
-    expect(input('name').selectionStart).toBe(4)
+    // caret avançou para 4: 24 + 4 × 10.
+    expect(caretLeft()).toBe('64px')
   })
 
   it('backspace remove o caractere à esquerda do caret no meio (Cenário 4)', () => {
-    render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
+    renderVK()
     typeName('maria')
-    input('name').setSelectionRange(3, 3)
+    tapCaret('name', 3)
     fireEvent.click(vkey('Apagar'))
     expect(input('name').value).toBe('Maia')
-    expect(input('name').selectionStart).toBe(2)
+    // caret recuou para 2: 24 + 2 × 10.
+    expect(caretLeft()).toBe('44px')
   })
 
   it('backspace com caret no início é no-op (Cenário 5)', () => {
-    render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
+    renderVK()
     typeName('maria')
-    input('name').setSelectionRange(0, 0)
+    tapCaret('name', 0)
     fireEvent.click(vkey('Apagar'))
     expect(input('name').value).toBe('Maria')
-    expect(input('name').selectionStart).toBe(0)
+    // caret permanece no início: 24 + 0.
+    expect(caretLeft()).toBe('24px')
   })
 
   it('edita o telefone no meio reaplicando a máscara e reposicionando o caret (Cenário 8)', () => {
-    render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
+    renderVK()
     fireEvent.click(input('phone'))
     for (const d of '1198765') fireEvent.click(vkey(d))
     expect(input('phone').value).toBe('(11) 98765')
-    input('phone').setSelectionRange(7, 7) // logo após o 4º dígito ('8')
+    tapCaret('phone', 7) // logo após o 4º dígito ('8')
     fireEvent.click(vkey('0'))
     expect(input('phone').value).toBe('(11) 98076-5')
-    expect(input('phone').selectionStart).toBe(8)
+    // caret 8 no valor mascarado: 24 + 8 × 10.
+    expect(caretLeft()).toBe('104px')
   })
 
-  it('remapeia email→text sob VK preservando inputMode none (achado crítico do Tech Lead)', () => {
-    render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
-    expect(input('email').getAttribute('type')).toBe('text')
-    expect(input('email').getAttribute('inputmode')).toBe('none')
+  it('mantém type=email sob VK (sem remap; readOnly dispensa setSelectionRange — HUB-78)', () => {
+    renderVK()
+    expect(input('email').getAttribute('type')).toBe('email')
+    expect(input('email').getAttribute('inputmode')).toBeNull()
     expect(input('phone').getAttribute('type')).toBe('tel')
   })
 
-  it('inputs ativos exibem caret visível (caret-color)', () => {
-    render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
-    expect(input('name').className).toContain('caret-[#0333BD]')
+  it('o CaretOverlay aparece só no campo ativo e acompanha a troca de foco (HUB-78)', () => {
+    renderVK()
+    expect(caret()).toBeNull() // nenhum campo ativo ainda
+    fireEvent.click(input('name'))
+    expect(caret()).not.toBeNull()
+    expect(caret()!.parentElement!.querySelector('input')!.id).toBe('name')
+    fireEvent.click(input('email'))
+    // continua existindo um único caret, agora no campo email.
+    expect(document.querySelectorAll('[data-testid="vk-caret"]').length).toBe(1)
+    expect(caret()!.parentElement!.querySelector('input')!.id).toBe('email')
   })
 
   it('destaca o campo ativo com borda azul + ring; os demais seguem accent', () => {
@@ -247,7 +267,6 @@ describe('LeadForm — SHIFT e auto-shift (HUB-71)', () => {
     fireEvent.click(vkey('a')) // name = 'Ma'
     fireEvent.click(input('email')) // sai do name
     fireEvent.click(input('name')) // volta ao name JÁ preenchido → sem auto-shift
-    input('name').setSelectionRange(2, 2)
     fireEvent.click(vkey('r')) // sem shift → minúscula (se houvesse auto-shift, seria 'R')
     expect(input('name').value).toBe('Mar')
   })
