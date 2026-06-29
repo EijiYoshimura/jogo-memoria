@@ -31,6 +31,8 @@ function makeConfig(virtualKeyboardEnabled?: boolean): GameConfig {
 const input = (id: string) => document.getElementById(id) as HTMLInputElement
 const vkey = (name: string) =>
   within(screen.getByRole('group', { name: 'Teclado virtual' })).getByRole('button', { name })
+const consentCheckbox = () => screen.getByRole('checkbox')
+const acceptConsent = () => fireEvent.click(consentCheckbox())
 
 describe('LeadForm — modo LIGADO (virtualKeyboard.enabled: true)', () => {
   it('suprime o teclado nativo: inputs com readOnly e inputMode none (proxy do Cenário 1)', () => {
@@ -117,20 +119,22 @@ describe('LeadForm — modo DESLIGADO (default)', () => {
 })
 
 describe('LeadForm — validação e submit (comum aos dois modos — Cenários 10 e 11)', () => {
-  it('bloqueia submit com obrigatório vazio e exibe mensagem', () => {
+  it('bloqueia submit com obrigatório vazio e exibe mensagem (consentimento marcado)', () => {
     const onSubmit = vi.fn()
     render(<LeadForm config={makeConfig(undefined)} onSubmit={onSubmit} />)
+    acceptConsent() // habilita o ENVIAR; isola a validação de campos
     fireEvent.click(screen.getByRole('button', { name: 'ENVIAR' }))
     expect(onSubmit).not.toHaveBeenCalled()
     expect(screen.getByText('Nome completo é obrigatório')).toBeDefined()
   })
 
-  it('exibe "E-mail inválido" para formato inválido', () => {
+  it('exibe "E-mail inválido" para formato inválido (independente do checkbox — Cenário 15)', () => {
     const onSubmit = vi.fn()
     const { container } = render(<LeadForm config={makeConfig(undefined)} onSubmit={onSubmit} />)
+    acceptConsent()
     fireEvent.change(input('name'), { target: { value: 'Maria' } })
     fireEvent.change(input('email'), { target: { value: 'invalido' } })
-    // Dispara o submit no form para exercitar o validate() em JS (Cenário 10).
+    // Dispara o submit no form para exercitar o validate() em JS.
     // jsdom curto-circuita o caminho click→submit num input type="email" inválido
     // pela constraint validation nativa; o submit direto valida a lógica do produto.
     fireEvent.submit(container.querySelector('form')!)
@@ -138,11 +142,12 @@ describe('LeadForm — validação e submit (comum aos dois modos — Cenários 
     expect(screen.getByText('E-mail inválido')).toBeDefined()
   })
 
-  it('submete quando tudo é válido', () => {
+  it('submete quando tudo é válido e consentimento marcado (Cenário 8)', () => {
     const onSubmit = vi.fn()
     render(<LeadForm config={makeConfig(undefined)} onSubmit={onSubmit} />)
     fireEvent.change(input('name'), { target: { value: 'Maria' } })
     fireEvent.change(input('email'), { target: { value: 'maria@exemplo.com' } })
+    acceptConsent()
     fireEvent.click(screen.getByRole('button', { name: 'ENVIAR' }))
     expect(onSubmit).toHaveBeenCalledTimes(1)
     expect(onSubmit).toHaveBeenCalledWith(
@@ -152,6 +157,7 @@ describe('LeadForm — validação e submit (comum aos dois modos — Cenários 
 
   it('no modo ligado, submit inválido mantém o teclado virtual disponível (Cenário 11)', () => {
     render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
+    acceptConsent()
     fireEvent.click(input('name'))
     expect(screen.getByRole('group', { name: 'Teclado virtual' })).toBeDefined()
     fireEvent.click(screen.getByRole('button', { name: 'ENVIAR' }))
@@ -191,8 +197,9 @@ describe('LeadForm — layout BB Seguros (HUB-65)', () => {
     expect(el.style.borderColor).toBe('rgb(252, 252, 48)')
   })
 
-  it('botão ENVIAR pill amarelo com texto azul e fonte BB (Cenário 6)', () => {
+  it('botão ENVIAR pill amarelo com texto azul e fonte BB (Cenário 6, habilitado)', () => {
     render(<LeadForm config={makeConfig(undefined)} onSubmit={vi.fn()} />)
+    acceptConsent() // habilitado → fundo accent cheio
     const btn = screen.getByRole('button', { name: 'ENVIAR' })
     expect(btn.className).toContain('rounded-full')
     expect(btn.className).toContain('font-bb-titulos')
@@ -205,5 +212,106 @@ describe('LeadForm — layout BB Seguros (HUB-65)', () => {
     cfg.event.accentColor = '#00FF00'
     render(<LeadForm config={cfg} onSubmit={vi.fn()} />)
     expect(input('name').style.borderColor).toBe('rgb(0, 255, 0)')
+  })
+})
+
+describe('LeadForm — consentimento LGPD (HUB-67)', () => {
+  const withLgpd = (lgpd: NonNullable<GameConfig['lgpd']>): GameConfig => {
+    const cfg = makeConfig(undefined)
+    return { ...cfg, lgpd }
+  }
+  const termsLink = () => screen.getByRole('button', { name: 'termos de consentimento' })
+
+  it('checkbox inicia desmarcado e alterna ao clicar (Cenário 2)', () => {
+    render(<LeadForm config={makeConfig(undefined)} onSubmit={vi.fn()} />)
+    expect(consentCheckbox()).toHaveProperty('checked', false)
+    acceptConsent()
+    expect(consentCheckbox()).toHaveProperty('checked', true)
+    acceptConsent()
+    expect(consentCheckbox()).toHaveProperty('checked', false)
+  })
+
+  it('ENVIAR inicia desabilitado e habilita ao marcar o aceite (Cenário 6)', () => {
+    render(<LeadForm config={makeConfig(undefined)} onSubmit={vi.fn()} />)
+    const btn = screen.getByRole('button', { name: 'ENVIAR' }) as HTMLButtonElement
+    expect(btn.disabled).toBe(true)
+    acceptConsent()
+    expect(btn.disabled).toBe(false)
+  })
+
+  it('link "termos" abre o modal e NÃO marca o checkbox (Cenário 3)', () => {
+    render(<LeadForm config={makeConfig(undefined)} onSubmit={vi.fn()} />)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    fireEvent.click(termsLink())
+    expect(screen.getByRole('dialog')).toBeDefined()
+    expect(consentCheckbox()).toHaveProperty('checked', false)
+  })
+
+  it('modal tem rótulo acessível e exibe o texto templado de buildConsentText (Cenários 5/11)', () => {
+    render(<LeadForm config={makeConfig(undefined)} onSubmit={vi.fn()} />)
+    fireEvent.click(termsLink())
+    const dialog = screen.getByRole('dialog')
+    expect(dialog.getAttribute('aria-modal')).toBe('true')
+    expect(within(dialog).getByText(/você autoriza/i)).toBeDefined()
+  })
+
+  it('fecha o modal por Esc preservando o estado do checkbox (Cenário 4)', () => {
+    render(<LeadForm config={makeConfig(undefined)} onSubmit={vi.fn()} />)
+    acceptConsent()
+    fireEvent.click(termsLink())
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(consentCheckbox()).toHaveProperty('checked', true)
+  })
+
+  it('fecha o modal clicando no backdrop (Cenário 4)', () => {
+    render(<LeadForm config={makeConfig(undefined)} onSubmit={vi.fn()} />)
+    fireEvent.click(termsLink())
+    const backdrop = screen.getByRole('dialog').parentElement as HTMLElement
+    fireEvent.click(backdrop)
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('modal exibe consentText custom como texto puro, sem injetar HTML (Cenário 11)', () => {
+    const cfg = withLgpd({
+      consentVersion: '2.0',
+      dataController: 'Empresa',
+      purposeText: 'para contato',
+      retentionMonths: 6,
+      consentText: 'Aceito <b>tudo</b> conforme a LGPD.',
+    })
+    const { container } = render(<LeadForm config={cfg} onSubmit={vi.fn()} />)
+    fireEvent.click(termsLink())
+    expect(container.querySelector('dialog, [role="dialog"] b')).toBeNull()
+    expect(screen.getByText(/Aceito <b>tudo<\/b> conforme a LGPD\./)).toBeDefined()
+    expect(screen.queryByText(/você autoriza/i)).toBeNull()
+  })
+
+  it('Política de Privacidade in-app acessível pelo modal quando privacyPolicyPath (Cenário 12)', () => {
+    const cfg = withLgpd({
+      consentVersion: '1.0',
+      dataController: 'Empresa',
+      purposeText: 'para contato',
+      retentionMonths: 12,
+      privacyPolicyPath: '/privacy-policy.html',
+    })
+    const { container } = render(<LeadForm config={cfg} onSubmit={vi.fn()} />)
+    fireEvent.click(termsLink())
+    fireEvent.click(screen.getByRole('button', { name: /Ler Política de Privacidade/i }))
+    const iframe = container.querySelector('iframe')
+    expect(iframe?.getAttribute('src')).toBe('/privacy-policy.html')
+    expect(iframe?.getAttribute('sandbox')).toBe('')
+  })
+
+  it('gating: submit por Enter sem aceite bloqueia e mostra mensagem; some ao marcar (Cenário 7)', () => {
+    const onSubmit = vi.fn()
+    const { container } = render(<LeadForm config={makeConfig(undefined)} onSubmit={onSubmit} />)
+    fireEvent.change(input('name'), { target: { value: 'Maria' } })
+    fireEvent.change(input('email'), { target: { value: 'maria@exemplo.com' } })
+    fireEvent.submit(container.querySelector('form')!)
+    expect(onSubmit).not.toHaveBeenCalled()
+    expect(screen.getByText('É necessário aceitar os termos para participar')).toBeDefined()
+    acceptConsent()
+    expect(screen.queryByText('É necessário aceitar os termos para participar')).toBeNull()
   })
 })
