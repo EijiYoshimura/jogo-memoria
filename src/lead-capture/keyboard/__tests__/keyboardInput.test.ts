@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { applyKey } from '../keyboardInput'
+import { applyPhoneMask } from '../../mask/phoneMask'
 import type { KeyboardKey } from '../keyboardLayouts'
 
 const char = (value: string): KeyboardKey => ({ label: value, value })
@@ -12,7 +13,13 @@ const TOGGLE_SYMBOLS: KeyboardKey = { label: '?123', action: 'toggle-symbols' }
 function call(
   currentValue: string,
   key: KeyboardKey,
-  opts: Partial<{ isShifted: boolean; fieldType: string; hasMask: boolean }> = {}
+  opts: Partial<{
+    isShifted: boolean
+    fieldType: string
+    hasMask: boolean
+    caretStart: number
+    caretEnd: number
+  }> = {}
 ) {
   return applyKey({
     currentValue,
@@ -20,8 +27,12 @@ function call(
     isShifted: opts.isShifted ?? false,
     fieldType: opts.fieldType ?? 'text',
     hasMask: opts.hasMask ?? false,
+    caretStart: opts.caretStart,
+    caretEnd: opts.caretEnd,
   })
 }
+
+const tel = (caretStart?: number) => ({ fieldType: 'tel', hasMask: true, caretStart })
 
 describe('applyKey — char', () => {
   it('anexa caractere minúsculo no fim', () => {
@@ -105,5 +116,90 @@ describe('applyKey — toggle-symbols (no-op preservador)', () => {
     const on = call('abc', TOGGLE_SYMBOLS, { isShifted: true })
     expect(on.nextRaw).toBe('abc')
     expect(on.nextShift).toBe(true)
+  })
+})
+
+describe('applyKey — caret (HUB-69)', () => {
+  it('insere caractere na posição do caret e avança 1 (Cenário 3)', () => {
+    const r = call('Maria', char('x'), { caretStart: 3 })
+    expect(r.nextRaw).toBe('Marxia')
+    expect(r.nextCaret).toBe(4)
+  })
+
+  it('preserva o entorno ao inserir no meio (Cenário 6)', () => {
+    expect(call('abcdef', char('Z'), { caretStart: 2 }).nextRaw).toBe('abZcdef')
+  })
+
+  it('backspace remove o caractere à esquerda do caret e recua 1 (Cenário 4)', () => {
+    const r = call('Maria', BACKSPACE, { caretStart: 3 })
+    expect(r.nextRaw).toBe('Maia')
+    expect(r.nextCaret).toBe(2)
+  })
+
+  it('backspace com caret no início é no-op (Cenário 5)', () => {
+    const r = call('Maria', BACKSPACE, { caretStart: 0 })
+    expect(r.nextRaw).toBe('Maria')
+    expect(r.nextCaret).toBe(0)
+  })
+
+  it('sem caretStart usa o fim da string (retrocompat — Cenário 7)', () => {
+    expect(call('Mari', char('a')).nextCaret).toBe(5)
+    expect(call('Maria', BACKSPACE).nextCaret).toBe(4)
+  })
+
+  it('range (start !== end) é tratado como caretStart (decisão PO 2)', () => {
+    const r = call('Maria', char('x'), { caretStart: 1, caretEnd: 4 })
+    expect(r.nextRaw).toBe('Mxaria')
+    expect(r.nextCaret).toBe(2)
+  })
+
+  it('space insere na posição do caret e avança 1', () => {
+    const r = call('abc', SPACE, { caretStart: 1 })
+    expect(r.nextRaw).toBe('a bc')
+    expect(r.nextCaret).toBe(2)
+  })
+
+  it('clear zera o caret; shift/toggle preservam o caret', () => {
+    expect(call('abc', CLEAR, { caretStart: 2 }).nextCaret).toBe(0)
+    expect(call('abc', SHIFT, { caretStart: 2 }).nextCaret).toBe(2)
+    expect(call('abc', TOGGLE_SYMBOLS, { caretStart: 2 }).nextCaret).toBe(2)
+  })
+})
+
+describe('applyKey — tel com caret no meio (Cenários 8 e 9)', () => {
+  it('insere dígito no meio sobre os dígitos crus, reaplica máscara e posiciona o caret após o dígito', () => {
+    // '(11) 98765-4' = dígitos crus '11987654'; caret 7 = logo após o 4º dígito ('8').
+    const r = call('(11) 98765-4', char('0'), { ...tel(7) })
+    expect(r.nextRaw).toBe('119807654')
+    expect(applyPhoneMask(r.nextRaw)).toBe('(11) 98076-54')
+    // caret logo após o '0' inserido (5º dígito) no valor mascarado, pulando separadores.
+    expect(r.nextCaret).toBe(8)
+  })
+
+  it('respeita o teto de 11 dígitos ao inserir no meio de um número cheio', () => {
+    const r = call('(11) 99999-8888', char('0'), { ...tel(6) })
+    expect(r.nextRaw.length).toBe(11)
+  })
+
+  it('backspace no meio remove o dígito à esquerda (não o separador — Cenário 9)', () => {
+    // caret 5 = logo após o espaço ') '; à esquerda há o 2º dígito do DDD, não o separador.
+    const r = call('(11) 99999-8888', BACKSPACE, { ...tel(5) })
+    expect(r.nextRaw).toBe('1999998888')
+    expect(r.nextCaret).toBe(2)
+  })
+
+  it('backspace com caret antes do 1º dígito é no-op no tel', () => {
+    const r = call('(11) 99', BACKSPACE, { ...tel(1) })
+    expect(r.nextRaw).toBe('1199')
+    expect(r.nextCaret).toBe(0)
+  })
+
+  it('backspace no fim do tel mantém o comportamento atual (retrocompat)', () => {
+    expect(call('(11) 98', BACKSPACE, { fieldType: 'tel', hasMask: true }).nextRaw).toBe('119')
+  })
+
+  it('inserir no fim do tel sem caret usa o fim (retrocompat)', () => {
+    const r = call('(11) 9', char('8'), { fieldType: 'tel', hasMask: true })
+    expect(r.nextRaw).toBe('1198')
   })
 })
