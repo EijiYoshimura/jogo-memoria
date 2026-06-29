@@ -30,7 +30,7 @@ export function SplashScreen({ config, onStart, onAdminAccess }: SplashScreenPro
 
   return (
     <div
-      className="flex flex-col items-center justify-center h-full w-full select-none"
+      className="flex flex-col items-center justify-center h-full w-full select-none overflow-hidden rounded-[2.25rem] border-8 border-white"
       style={{ backgroundColor: config.event.backgroundColor }}
     >
       <div className="flex flex-col items-center gap-6 w-full" onClick={handleLogoTap}>
