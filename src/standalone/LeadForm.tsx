@@ -13,6 +13,9 @@ interface LeadFormProps {
   onSubmit: (formData: Record<string, string>) => void
 }
 
+const DEFAULT_ACCENT_COLOR = '#FCFC30'
+const ERROR_BORDER_COLOR = '#EF4444'
+
 function applyPhoneMask(value: string): string {
   const digits = value.replace(/\D/g, '').slice(0, 11)
   if (digits.length <= 2) return digits
@@ -27,6 +30,7 @@ export function LeadForm({ config, onSubmit }: LeadFormProps) {
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const vkEnabled = config.leadForm.virtualKeyboard?.enabled ?? false
+  const accent = config.event.accentColor ?? DEFAULT_ACCENT_COLOR
   const { activeFieldId, isShifted, setActiveField, setShift } = useVirtualKeyboard(vkEnabled)
 
   const activeField = config.leadForm.fields.find((f) => f.id === activeFieldId) ?? null
@@ -82,33 +86,36 @@ export function LeadForm({ config, onSubmit }: LeadFormProps) {
 
   return (
     <div
-      className="flex flex-col h-full w-full"
+      className="flex flex-col h-full w-full overflow-hidden rounded-[2.25rem] border-8 border-white"
       style={{ backgroundColor: config.event.backgroundColor }}
     >
       <div
-        className={`flex flex-col items-center w-full p-8 overflow-y-auto ${
+        className={`flex flex-col items-center w-full px-[8%] py-8 overflow-y-auto ${
           vkEnabled ? 'flex-1 justify-start' : 'justify-center h-full'
         }`}
       >
-        <div className="w-full max-w-lg">
-          <h1
-            className="text-3xl font-bold text-center mb-8"
-            style={{ color: config.event.primaryColor }}
+        <div className="w-full max-w-lg flex flex-col items-center">
+          <img
+            src="/images/logo_bb.png"
+            alt="BB Seguros"
+            className={`mx-auto object-contain mb-10 ${vkEnabled ? 'w-[30%] mt-2' : 'w-[42%] mt-[9%]'}`}
+            draggable={false}
+          />
+          <form
+            onSubmit={handleSubmit}
+            className="flex flex-col gap-6 w-full"
+            autoComplete="off"
           >
-            {config.leadForm.title}
-          </h1>
-          <form onSubmit={handleSubmit} className="flex flex-col gap-5" autoComplete="off">
             {config.leadForm.fields.map((field) => {
-              const isActive = vkEnabled && activeFieldId === field.id
+              const hasError = !!errors[field.id]
               return (
-                <div key={field.id} className="flex flex-col gap-1">
+                <div key={field.id} className="flex flex-col gap-2">
                   <label
                     htmlFor={field.id}
-                    className="text-white font-medium"
-                    style={{ fontSize: '18px' }}
+                    className="font-bb-titulos italic font-bold uppercase text-white text-2xl"
                   >
                     {field.label}
-                    {field.required && <span className="text-red-400 ml-1">*</span>}
+                    {field.required && <span className="text-[#FFC7C7] ml-1">*</span>}
                   </label>
                   <input
                     id={field.id}
@@ -120,6 +127,8 @@ export function LeadForm({ config, onSubmit }: LeadFormProps) {
                     autoComplete="off"
                     readOnly={vkEnabled}
                     aria-readonly={vkEnabled || undefined}
+                    aria-invalid={hasError || undefined}
+                    aria-describedby={hasError ? `${field.id}-error` : undefined}
                     inputMode={
                       vkEnabled ? 'none' : field.type === 'tel' ? 'numeric' : undefined
                     }
@@ -129,27 +138,30 @@ export function LeadForm({ config, onSubmit }: LeadFormProps) {
                           onFocus: () => setActiveField(field.id),
                         }
                       : {})}
-                    className={`w-full rounded-xl px-4 bg-white text-gray-900 border-2 outline-none focus:border-opacity-100 ${
-                      errors[field.id]
-                        ? 'border-red-500'
-                        : isActive
-                          ? 'border-purple-400'
-                          : 'border-transparent focus:border-purple-400'
-                    }`}
-                    style={{ minHeight: '56px', fontSize: '20px' }}
+                    className="w-full rounded-full bg-white text-gray-900 border-4 px-5 outline-none font-bb-textos focus:ring-2 focus:ring-[#0333BD]"
+                    style={{
+                      minHeight: '56px',
+                      fontSize: '20px',
+                      borderColor: hasError ? ERROR_BORDER_COLOR : accent,
+                    }}
                   />
-                  {errors[field.id] && (
-                    <span className="text-red-400 text-base">{errors[field.id]}</span>
+                  {hasError && (
+                    <span
+                      id={`${field.id}-error`}
+                      className="text-[#FFC7C7] font-bb-textos text-base"
+                    >
+                      {errors[field.id]}
+                    </span>
                   )}
                 </div>
               )
             })}
             <button
               type="submit"
-              className="mt-4 w-full rounded-xl font-bold text-white text-xl py-4 transition-opacity active:opacity-80"
-              style={{ backgroundColor: config.event.primaryColor, minHeight: '64px' }}
+              className="mt-8 mx-auto w-[38%] rounded-full border-4 border-white text-[#0333BD] font-bb-titulos font-extrabold uppercase text-xl min-h-[56px] px-6 transition-opacity active:opacity-80"
+              style={{ backgroundColor: accent }}
             >
-              Jogar
+              ENVIAR
             </button>
           </form>
         </div>
