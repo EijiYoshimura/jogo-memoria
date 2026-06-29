@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { GameConfig } from '../game/types'
 import { buildConsentText, getPurposeText } from './lib/lgpd'
+import { sanitizeExternalUrl } from './lib/sanitizeExternalUrl'
 import { PrivacyPolicyScreen } from './PrivacyPolicyScreen'
 
 interface TermsModalProps {
@@ -30,7 +31,7 @@ export function TermsModal({ config, onClose }: TermsModalProps) {
   const consentText = buildConsentText(config)
   const purposeText = getPurposeText(config)
   const privacyPolicyPath = config.lgpd?.privacyPolicyPath
-  const privacyPolicyUrl = config.lgpd?.privacyPolicyUrl
+  const privacyPolicyUrl = sanitizeExternalUrl(config.lgpd?.privacyPolicyUrl)
 
   // Foco inicial no card + trava o scroll do body; restaura no unmount.
   useEffect(() => {

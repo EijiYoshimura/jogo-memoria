@@ -150,4 +150,25 @@ describe('TermsModal', () => {
     fireEvent.click(screen.getByRole('button', { name: /Ler Política de Privacidade/i }))
     expect(screen.getByRole('heading', { name: 'Política de Privacidade' })).toBeDefined()
   })
+
+  it('HUB-61: renderiza o link externo (href) com privacyPolicyUrl https seguro', () => {
+    render(
+      <TermsModal
+        config={withLgpd({ privacyPolicyUrl: 'https://exemplo.com/politica' })}
+        onClose={vi.fn()}
+      />
+    )
+    const link = screen.getByRole('link', { name: /Ler Política de Privacidade/i })
+    expect(link.getAttribute('href')).toBe('https://exemplo.com/politica')
+  })
+
+  it('HUB-61: NÃO renderiza o link externo com privacyPolicyUrl javascript: (anti-XSS)', () => {
+    render(
+      <TermsModal
+        config={withLgpd({ privacyPolicyUrl: 'javascript:alert(1)' })}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.queryByRole('link', { name: /Ler Política de Privacidade/i })).toBeNull()
+  })
 })

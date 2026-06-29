@@ -1,5 +1,6 @@
 import { useCallback, useRef } from 'react'
 import type { GameConfig } from '../game/types'
+import { sanitizeExternalUrl } from './lib/sanitizeExternalUrl'
 
 interface SplashScreenProps {
   config: GameConfig
@@ -13,6 +14,7 @@ const CTA_TEXT_COLOR = '#0333BD'
 export function SplashScreen({ config, onStart, onAdminAccess }: SplashScreenProps) {
   const logoTapsRef = useRef<number[]>([])
   const accent = config.event.accentColor ?? DEFAULT_ACCENT_COLOR
+  const logoUrl = sanitizeExternalUrl(config.event.logo)
 
   const handleLogoTap = useCallback(
     (e: React.MouseEvent | React.TouchEvent) => {
@@ -34,16 +36,18 @@ export function SplashScreen({ config, onStart, onAdminAccess }: SplashScreenPro
       style={{ backgroundColor: config.event.backgroundColor }}
     >
       <div className="flex flex-col items-center gap-6 w-full" onClick={handleLogoTap}>
-        <img
-          src={config.event.logo}
-          alt={config.event.name}
-          className="w-[75%] object-contain"
-          draggable={false}
-          onError={(e) => {
-            const target = e.currentTarget
-            target.style.display = 'none'
-          }}
-        />
+        {logoUrl && (
+          <img
+            src={logoUrl}
+            alt={config.event.name}
+            className="w-[75%] object-contain"
+            draggable={false}
+            onError={(e) => {
+              const target = e.currentTarget
+              target.style.display = 'none'
+            }}
+          />
+        )}
       </div>
 
       <button
