@@ -28,16 +28,64 @@ describe('resolveLayout', () => {
 })
 
 describe('LAYOUT_REGISTRY', () => {
-  it('layout alpha-ptbr tem a tecla ç', () => {
-    const allKeys = LAYOUT_REGISTRY['alpha-ptbr'].rows.flat()
-    expect(allKeys.some((k) => k.value === 'ç')).toBe(true)
+  it('layout alpha-ptbr tem a fileira numérica fixa 1..0 no topo (Cenário 1/2)', () => {
+    const firstRow = LAYOUT_REGISTRY['alpha-ptbr'].rows[0]
+    expect(firstRow.map((k) => k.value)).toEqual(
+      ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0']
+    )
   })
 
-  it('layout alpha-ptbr expõe acentos diretos (á, ã, é)', () => {
+  it('layout alpha-ptbr NÃO tem mais a fileira de acentos diretos nem a tecla ç', () => {
     const values = LAYOUT_REGISTRY['alpha-ptbr'].rows.flat().map((k) => k.value)
-    expect(values).toContain('á')
-    expect(values).toContain('ã')
-    expect(values).toContain('é')
+    expect(values).not.toContain('á')
+    expect(values).not.toContain('ã')
+    expect(values).not.toContain('ç')
+  })
+
+  it('expõe variants pt-BR exatamente conforme Cenário 5', () => {
+    const byValue = (v: string) =>
+      LAYOUT_REGISTRY['alpha-ptbr'].rows.flat().find((k) => k.value === v)
+    expect(byValue('a')?.variants).toEqual(['á', 'ã', 'â', 'à', 'ä'])
+    expect(byValue('e')?.variants).toEqual(['é', 'ê', 'è', 'ë'])
+    expect(byValue('i')?.variants).toEqual(['í', 'î', 'ì', 'ï'])
+    expect(byValue('o')?.variants).toEqual(['ó', 'õ', 'ô', 'ò', 'ö'])
+    expect(byValue('u')?.variants).toEqual(['ú', 'û', 'ù', 'ü'])
+    expect(byValue('c')?.variants).toEqual(['ç'])
+    expect(byValue('n')?.variants).toEqual(['ñ'])
+  })
+
+  it('teclas sem acento não têm variants (ex.: t, s)', () => {
+    const byValue = (v: string) =>
+      LAYOUT_REGISTRY['alpha-ptbr'].rows.flat().find((k) => k.value === v)
+    expect(byValue('t')?.variants).toBeUndefined()
+    expect(byValue('s')?.variants).toBeUndefined()
+  })
+
+  it('layout symbols existe e cobre o conjunto do Cenário 8', () => {
+    const symbols = LAYOUT_REGISTRY['symbols']
+    expect(symbols).toBeDefined()
+    const values = symbols.rows.flat().map((k) => k.value)
+    for (const s of ['@', '#', '&', '_', '-', '/', ':', ';', '(', ')', '$', '!', '?', '.', ',']) {
+      expect(values).toContain(s)
+    }
+    // tecla de retorno ao alfabético
+    expect(symbols.rows.flat().some((k) => k.action === 'toggle-symbols' && k.label === 'ABC')).toBe(true)
+    // fileira numérica fixa também no modo símbolos
+    expect(symbols.rows[0].map((k) => k.value)).toEqual(
+      ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0']
+    )
+  })
+
+  it('alpha-ptbr tem a tecla de troca ?123 (toggle-symbols)', () => {
+    expect(
+      LAYOUT_REGISTRY['alpha-ptbr'].rows
+        .flat()
+        .some((k) => k.action === 'toggle-symbols' && k.label === '?123')
+    ).toBe(true)
+  })
+
+  it('layout numeric usa align center (dialpad) e mantém o conteúdo', () => {
+    expect(LAYOUT_REGISTRY['numeric'].align).toBe('center')
   })
 
   it('layout email expõe @ e . fixos', () => {

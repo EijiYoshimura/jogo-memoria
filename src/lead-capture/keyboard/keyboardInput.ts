@@ -62,5 +62,9 @@ export function applyKey(input: ApplyKeyInput): ApplyKeyResult {
       return { nextRaw: input.currentValue + ' ', nextShift: input.isShifted }
     case 'shift':
       return { nextRaw: input.currentValue, nextShift: !input.isShifted }
+    case 'toggle-symbols':
+      // Troca de modo é resolvida na apresentação (VirtualKeyboard); aqui é no-op
+      // total — mantém o switch exaustivo e type-safe sobre KeyAction (sem default).
+      return { nextRaw: input.currentValue, nextShift: input.isShifted }
   }
 }
