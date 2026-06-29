@@ -37,11 +37,25 @@ export default defineConfig({
       ],
     },
     workbox: {
-      // 75a: app-shell mínimo para "installable". Precache agressivo de
-      // fontes/imagens e runtime caching ficam para a HUB-81 (75b).
-      globPatterns: ['**/*.{js,css,html}'],
+      // 75b (HUB-81): precache do app-shell completo para abrir offline —
+      // JS/CSS/HTML + fontes BB (.woff2), imagens dos cards/logos (.png/.svg),
+      // manifest (.webmanifest) e favicon (.ico).
+      globPatterns: ['**/*.{js,css,html,woff2,png,svg,webmanifest,ico}'],
+      // O bundle principal (~1.5 MB, build com minify:false) excede o limite
+      // padrão de 2 MiB; elevar para garantir que o chunk entre no precache.
+      maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+      // autoUpdate: descartar precaches de versões anteriores no activate.
+      cleanupOutdatedCaches: true,
       navigateFallback: '/index.html',
       navigateFallbackDenylist: [/^\/remoteEntry\.js$/, /\/api\//],
+      runtimeCaching: [
+        {
+          // Supabase (sync de leads): nunca cachear chamadas de dados —
+          // o leadsSync decide online/offline e o idb persiste localmente.
+          urlPattern: /^https:\/\/[a-z0-9-]+\.supabase\.co\/.*/i,
+          handler: 'NetworkOnly',
+        },
+      ],
     },
   })],
   build: {
