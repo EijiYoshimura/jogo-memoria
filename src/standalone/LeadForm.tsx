@@ -109,14 +109,16 @@ export function LeadForm({ config, onSubmit }: LeadFormProps) {
     >
       <div
         className={`flex flex-col items-center w-full px-[8%] py-8 overflow-y-auto ${
-          vkEnabled ? 'flex-1 justify-start' : 'justify-center h-full'
+          vkEnabled ? 'flex-1' : 'justify-center h-full'
         }`}
       >
-        <div className="w-full max-w-lg flex flex-col items-center">
+        <div
+          className={`w-full max-w-lg flex flex-col items-center ${vkEnabled ? 'my-auto' : ''}`}
+        >
           <img
             src="/images/logo_bb.png"
             alt="BB Seguros"
-            className={`mx-auto object-contain mb-10 ${vkEnabled ? 'w-[30%] mt-2' : 'w-[42%] mt-[9%]'}`}
+            className={`mx-auto object-contain mb-10 ${vkEnabled ? 'w-[55%] mt-2' : 'w-[55%] mt-[9%]'}`}
             draggable={false}
           />
           <form
