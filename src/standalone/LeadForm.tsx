@@ -7,12 +7,30 @@ import {
   VirtualKeyboard,
   type KeyboardKey,
 } from '../lead-capture/keyboard'
+import {
+  caretIndexFromOffset,
+  clampCaretIndex,
+  createCanvasTextMeasurer,
+  INPUT_FONT,
+  nextVisibleScrollLeft,
+  type TextMeasurer,
+} from '../lead-capture/keyboard/caret'
 import { applyPhoneMask } from '../lead-capture/mask/phoneMask'
+import {
+  CaretOverlay,
+  CONTENT_LEFT_OFFSET_PX,
+  INPUT_PADDING_LEFT_PX,
+} from './CaretOverlay'
 import { TermsModal } from './TermsModal'
 
 interface LeadFormProps {
   config: GameConfig
   onSubmit: (formData: Record<string, string>) => void
+  /**
+   * Medidor de largura de texto (injetável). Default: canvas na fonte do input.
+   * Os testes injetam um medidor determinístico (jsdom não implementa measureText).
+   */
+  measureText?: TextMeasurer
 }
 
 const DEFAULT_ACCENT_COLOR = '#FCFC30'
@@ -24,43 +42,12 @@ const CONSENT_REQUIRED_MESSAGE = 'É necessário aceitar os termos para particip
 // Campo que recebe auto-shift (1ª letra maiúscula) ao ser ativado vazio (decisão PO 1).
 const AUTO_SHIFT_FIELD_ID = 'name'
 
-// Teclas de navegação/controle permitidas sob VK (não mutam o valor do campo).
-const NAVIGATION_KEYS = new Set([
-  'ArrowLeft',
-  'ArrowRight',
-  'ArrowUp',
-  'ArrowDown',
-  'Home',
-  'End',
-  'Tab',
-  'Shift',
-  'Control',
-  'Alt',
-  'Meta',
-])
-
 /** Esmaece um accent em hex 6 dígitos (40% alpha) para o estado desabilitado do botão. */
 function dimmedAccent(hex: string): string {
   return /^#[0-9a-fA-F]{6}$/.test(hex) ? `${hex}66` : hex
 }
 
-/**
- * Sob VK o input é editável (para o caret aparecer e o toque posicionar), mas a digitação
- * nativa é bloqueada: apenas o teclado virtual muta o valor. Permite navegação/seleção e
- * bloqueia qualquer tecla que insira/remova texto (imprimíveis, Backspace, Delete, Enter).
- */
-function blockNativeTextKey(e: React.KeyboardEvent<HTMLInputElement>): void {
-  if (NAVIGATION_KEYS.has(e.key)) return
-  e.preventDefault()
-}
-
-function blockNativeMutation(
-  e: React.FormEvent<HTMLInputElement> | React.ClipboardEvent | React.DragEvent
-): void {
-  e.preventDefault()
-}
-
-export function LeadForm({ config, onSubmit }: LeadFormProps) {
+export function LeadForm({ config, onSubmit, measureText }: LeadFormProps) {
   const [values, setValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(config.leadForm.fields.map((f) => [f.id, '']))
   )
@@ -73,9 +60,23 @@ export function LeadForm({ config, onSubmit }: LeadFormProps) {
   const accent = config.event.accentColor ?? DEFAULT_ACCENT_COLOR
   const { activeFieldId, isShifted, setActiveField, setShift } = useVirtualKeyboard(vkEnabled)
 
-  // Caret no input controlado: refs por campo + posição-alvo a reaplicar após o re-render.
+  // Caret customizado (HUB-78): sob VK os inputs são `readOnly` (suprime o teclado
+  // nativo do Android), então o caret nativo some. Todo o estado de caret vive aqui em
+  // React: `caretPos` por campo + `caretScrollLeft` do campo ativo. `refocusActive`
+  // re-foca o input após o clique numa tecla (que rouba o foco) — só quando há tecla.
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({})
-  const pendingCaret = useRef<number | null>(null)
+  const refocusActive = useRef(false)
+  const [caretPos, setCaretPos] = useState<Record<string, number>>({})
+  const [caretScrollLeft, setCaretScrollLeft] = useState(0)
+  const measure = useMemo<TextMeasurer>(
+    () => measureText ?? createCanvasTextMeasurer(INPUT_FONT),
+    [measureText]
+  )
+
+  function caretFor(fieldId: string): number {
+    const value = values[fieldId] ?? ''
+    return clampCaretIndex(caretPos[fieldId] ?? value.length, value.length)
+  }
 
   const activeField = config.leadForm.fields.find((f) => f.id === activeFieldId) ?? null
   const activeLayout = useMemo(
@@ -105,11 +106,9 @@ export function LeadForm({ config, onSubmit }: LeadFormProps) {
 
   function handleVirtualKey(key: KeyboardKey) {
     if (!activeField) return
-    const el = inputRefs.current[activeField.id]
     const current = values[activeField.id] ?? ''
-    // Lê o caret no momento da tecla; tocar no campo já posiciona a selectionStart (Cenário 2).
-    const caretStart = el?.selectionStart ?? current.length
-    const caretEnd = el?.selectionEnd ?? caretStart
+    // O caret é estado React (caretPos); default = fim do valor (HUB-78).
+    const caretStart = caretFor(activeField.id)
     const { nextRaw, nextShift, nextCaret } = applyKey({
       currentValue: current,
       key,
@@ -117,26 +116,50 @@ export function LeadForm({ config, onSubmit }: LeadFormProps) {
       fieldType: activeField.type,
       hasMask: !!activeField.mask,
       caretStart,
-      caretEnd,
+      caretEnd: caretStart,
     })
     setShift(nextShift)
-    pendingCaret.current = nextCaret
+    setCaretPos((prev) => ({ ...prev, [activeField.id]: nextCaret }))
+    refocusActive.current = true
     if ((key.action ?? 'char') !== 'shift') {
       handleChange(activeField.id, activeField.type, !!activeField.mask, nextRaw)
     }
   }
 
-  // Reposiciona o caret após o re-render controlado e re-foca o campo ativo (o clique na
-  // tecla "rouba" o foco). useLayoutEffect evita flicker entre o paint e o reposicionamento.
+  // Posiciona o caret por toque: converte o X do ponteiro para coords de conteúdo
+  // (descontados borda+padding e somado o scroll) e acha o índice mais próximo pela
+  // geometria — robusto no Android, onde o caret nativo do input readOnly não posiciona.
+  function handlePointerDown(fieldId: string, e: React.PointerEvent<HTMLInputElement>) {
+    const el = e.currentTarget
+    const offsetX = e.clientX - el.getBoundingClientRect().left - CONTENT_LEFT_OFFSET_PX + el.scrollLeft
+    const value = values[fieldId] ?? ''
+    setCaretPos((prev) => ({ ...prev, [fieldId]: caretIndexFromOffset(offsetX, value, measure) }))
+  }
+
+  // Após o re-render controlado: re-foca o campo ativo apenas quando uma tecla virtual o
+  // desfocou (o clique na tecla rouba o foco) e ajusta o scrollLeft para manter o caret
+  // visível em textos longos. useLayoutEffect evita flicker entre paint e reposicionamento.
   useLayoutEffect(() => {
-    const target = pendingCaret.current
-    if (target === null || !activeFieldId) return
+    if (!vkEnabled || !activeFieldId) return
     const el = inputRefs.current[activeFieldId]
     if (!el) return
-    el.focus()
-    el.setSelectionRange(target, target)
-    pendingCaret.current = null
-  })
+    if (refocusActive.current) {
+      el.focus()
+      refocusActive.current = false
+    }
+    const value = values[activeFieldId] ?? ''
+    const pos = clampCaretIndex(caretPos[activeFieldId] ?? value.length, value.length)
+    const caretX = CONTENT_LEFT_OFFSET_PX + measure(value.slice(0, pos))
+    const nextScroll = nextVisibleScrollLeft(
+      caretX,
+      el.scrollLeft,
+      el.clientWidth,
+      INPUT_PADDING_LEFT_PX
+    )
+    if (el.scrollLeft !== nextScroll) el.scrollLeft = nextScroll
+    // Guarda contra re-render em cadeia: só atualiza quando o scroll muda de fato.
+    if (caretScrollLeft !== nextScroll) setCaretScrollLeft(nextScroll)
+  }, [vkEnabled, activeFieldId, values, caretPos, caretScrollLeft, measure])
 
   function validate(): boolean {
     const newErrors: Record<string, string> = {}
@@ -213,42 +236,52 @@ export function LeadForm({ config, onSubmit }: LeadFormProps) {
                     {field.label}
                     {field.required && <span className="text-[#FFC7C7] ml-1">*</span>}
                   </label>
-                  <input
-                    id={field.id}
-                    ref={(el) => {
-                      inputRefs.current[field.id] = el
-                    }}
-                    type={vkEnabled && field.type === 'email' ? 'text' : field.type}
-                    value={values[field.id] ?? ''}
-                    onChange={(e) =>
-                      handleChange(field.id, field.type, !!field.mask, e.target.value)
-                    }
-                    autoComplete="off"
-                    aria-invalid={hasError || undefined}
-                    aria-describedby={hasError ? `${field.id}-error` : undefined}
-                    inputMode={
-                      vkEnabled ? 'none' : field.type === 'tel' ? 'numeric' : undefined
-                    }
-                    {...(vkEnabled
-                      ? {
-                          // Editável (sem readOnly) para o caret/toque funcionarem, mas a
-                          // digitação nativa é bloqueada — só o VK muta o valor.
-                          onClick: () => activateField(field.id),
-                          onFocus: () => activateField(field.id),
-                          onKeyDown: blockNativeTextKey,
-                          onBeforeInput: blockNativeMutation,
-                          onPaste: blockNativeMutation,
-                          onDrop: blockNativeMutation,
-                        }
-                      : {})}
-                    className="w-full rounded-full bg-white text-gray-900 border-4 px-5 outline-none font-bb-textos caret-[#0333BD] transition-shadow focus-visible:ring-2 focus-visible:ring-[#0333BD]"
-                    style={{
-                      minHeight: '56px',
-                      fontSize: '20px',
-                      borderColor,
-                      boxShadow,
-                    }}
-                  />
+                  <div className="relative">
+                    <input
+                      id={field.id}
+                      ref={(el) => {
+                        inputRefs.current[field.id] = el
+                      }}
+                      type={field.type}
+                      value={values[field.id] ?? ''}
+                      onChange={(e) =>
+                        handleChange(field.id, field.type, !!field.mask, e.target.value)
+                      }
+                      autoComplete="off"
+                      aria-invalid={hasError || undefined}
+                      aria-describedby={hasError ? `${field.id}-error` : undefined}
+                      inputMode={
+                        vkEnabled ? undefined : field.type === 'tel' ? 'numeric' : undefined
+                      }
+                      {...(vkEnabled
+                        ? {
+                            // readOnly suprime o teclado nativo do Android de forma
+                            // confiável (HUB-78), mas continua focável: só o teclado virtual
+                            // muta o valor. O caret é renderizado pelo CaretOverlay.
+                            readOnly: true,
+                            onClick: () => activateField(field.id),
+                            onFocus: () => activateField(field.id),
+                            onPointerDown: (e: React.PointerEvent<HTMLInputElement>) =>
+                              handlePointerDown(field.id, e),
+                          }
+                        : {})}
+                      className="w-full rounded-full bg-white text-gray-900 border-4 px-5 outline-none font-bb-textos transition-shadow focus-visible:ring-2 focus-visible:ring-[#0333BD]"
+                      style={{
+                        minHeight: '56px',
+                        fontSize: '20px',
+                        borderColor,
+                        boxShadow,
+                      }}
+                    />
+                    {isActive && (
+                      <CaretOverlay
+                        value={values[field.id] ?? ''}
+                        caretPos={caretFor(field.id)}
+                        measure={measure}
+                        scrollLeft={caretScrollLeft}
+                      />
+                    )}
+                  </div>
                   {hasError && (
                     <span
                       id={`${field.id}-error`}

@@ -44,3 +44,12 @@ body {
   font-family: system-ui, -apple-system, sans-serif;
   touch-action: manipulation;
 }
+
+/* Caret customizado do teclado virtual (HUB-78) — pisca via CSS, sem JS timer. */
+@keyframes vk-caret-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+.vk-caret {
+  animation: vk-caret-blink 1.06s step-end infinite;
+}
