@@ -1,6 +1,6 @@
 import type { Card } from './Card'
 
-export type GameStatus = 'idle' | 'playing' | 'won' | 'lost'
+export type GameStatus = 'idle' | 'preview' | 'playing' | 'won' | 'lost'
 
 export interface GameSession {
   id: string
