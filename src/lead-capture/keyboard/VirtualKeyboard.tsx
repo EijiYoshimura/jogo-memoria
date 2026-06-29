@@ -204,8 +204,10 @@ export function VirtualKeyboard({ layout, isShifted, onKey, visible }: VirtualKe
 
   if (!visible) return null
 
+  // Símbolos (?123) valem para o alfanumérico e para o e-mail — ambos têm a tecla de toggle.
+  const canUseSymbols = layout.id === 'alpha-ptbr' || layout.id === 'email'
   const effectiveLayout =
-    mode === 'symbols' && layout.id === 'alpha-ptbr' ? LAYOUT_REGISTRY['symbols'] : layout
+    mode === 'symbols' && canUseSymbols ? LAYOUT_REGISTRY['symbols'] : layout
   const naturalWidth = effectiveLayout.align === 'center'
   const baseRows =
     isShifted && effectiveLayout.shiftRows ? effectiveLayout.shiftRows : effectiveLayout.rows

@@ -88,9 +88,27 @@ describe('LAYOUT_REGISTRY', () => {
     expect(LAYOUT_REGISTRY['numeric'].align).toBe('center')
   })
 
-  it('layout email expõe @ e . fixos', () => {
+  it('layout email reusa exatamente as rows do alpha-ptbr (paridade — HUB-85)', () => {
+    expect(LAYOUT_REGISTRY['email'].rows).toBe(LAYOUT_REGISTRY['alpha-ptbr'].rows)
+  })
+
+  it('layout email tem a fileira numérica fixa 1..0 no topo (HUB-85)', () => {
+    const firstRow = LAYOUT_REGISTRY['email'].rows[0]
+    expect(firstRow.map((k) => k.value)).toEqual(
+      ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0']
+    )
+  })
+
+  it('layout email tem a tecla de troca ?123 (toggle-symbols) — HUB-85', () => {
+    expect(
+      LAYOUT_REGISTRY['email'].rows
+        .flat()
+        .some((k) => k.action === 'toggle-symbols' && k.label === '?123')
+    ).toBe(true)
+  })
+
+  it('layout email expõe . fixo (do alfanumérico)', () => {
     const values = LAYOUT_REGISTRY['email'].rows.flat().map((k) => k.value)
-    expect(values).toContain('@')
     expect(values).toContain('.')
   })
 

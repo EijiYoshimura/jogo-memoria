@@ -102,16 +102,13 @@ const SYMBOLS: KeyboardLayout = {
 
 const EMAIL: KeyboardLayout = {
   id: 'email',
+  // Mesmas rows do alpha-ptbr (numérica + QWERTY + shift + [?123, espaço, .]) por
+  // referência, garantindo paridade total; só acrescenta a linha de domínios (HUB-85).
+  rows: ALPHA_PTBR.rows,
   shortcutsRow: [
     { label: '@gmail.com', value: '@gmail.com' },
     { label: '@hotmail.com', value: '@hotmail.com' },
     { label: '@outlook.com', value: '@outlook.com' },
-  ],
-  rows: [
-    charRow('qwertyuiop'),
-    charRow('asdfghjkl'),
-    [SHIFT_KEY, ...charRow('zxcvbnm'), BACKSPACE_KEY],
-    [charKey('@'), charKey('.'), SPACE_KEY, charKey('-'), charKey('_'), CLEAR_KEY],
   ],
 }
 
