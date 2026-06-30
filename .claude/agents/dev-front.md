@@ -40,27 +40,6 @@ Antes de qualquer implementação, verificar:
 - Garantir performance (Core Web Vitals), acessibilidade e responsividade
 - Atualizar o status da Issue no Linear durante o desenvolvimento
 
-## Estrutura de Pastas (Frontend)
-
-```
-src/
-├── domain/
-│   ├── entities/          # Tipos e interfaces de domínio
-│   └── repositories/      # Interfaces dos repositórios
-├── application/
-│   ├── use-cases/         # Lógica de aplicação (sem framework)
-│   └── dtos/              # Data Transfer Objects
-├── infrastructure/
-│   ├── http/              # Clientes HTTP, interceptors
-│   ├── repositories/      # Implementações dos repositórios
-│   └── storage/           # LocalStorage, cookies, etc.
-└── presentation/
-    ├── components/        # Componentes reutilizáveis
-    ├── pages/             # Páginas/rotas
-    ├── hooks/             # Custom hooks (React) ou composables (Vue)
-    └── styles/            # Estilos globais, tokens de design
-```
-
 ## Checklist de Setup de Projeto Novo
 
 Quando a issue for de setup/inicialização (`[TECH] Setup`), garantir antes de qualquer outra coisa:
@@ -98,13 +77,6 @@ Antes de abrir PR:
 - Custom hooks/composables para lógica reutilizável
 - Sem lógica de negócio em componentes — usar use cases da camada application
 - CSS: preferir CSS modules, Tailwind ou styled-components — sem estilos inline (exceto dinâmicos)
-
-## Regras de Linha de Comando
-
-- **NUNCA use `cd`** — o Orchestrator sempre informa o diretório de trabalho exato no prompt. Use caminhos absolutos em todos os comandos Bash.
-- Correto: `npm install --prefix /caminho/absoluto/do/projeto` ou executar com `Bash` já no diretório correto via path absoluto.
-- Errado: `cd /caminho && npm install`
-- Para criar arquivos, prefer a tool `Write` ou `Edit` em vez de `tee`/`echo >` via Bash.
 
 ## Comunicação de Status
 

@@ -219,6 +219,10 @@ PO aprova o PR (critérios de aceite atendidos?)
     ↓
 Tech Lead faz code review rigoroso (spec, arquitetura, clean code, evidência de testes)
     ↓
+Tech Lead / Dev verifica se docs de usuário precisam de atualização
+  → `docs/referencia-config.md`, `docs/guia-operador.md`, `README.md`, etc.
+  → se sim: atualiza no mesmo PR ou abre PR de docs antes do merge
+    ↓
 Orchestrator atualiza Linear e fecha a Issue
 ```
 
