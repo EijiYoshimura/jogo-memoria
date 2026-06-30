@@ -12,10 +12,12 @@ Este guia descreve como configurar e operar o Jogo da Memória em um evento, do 
 4. [Variáveis de ambiente](#variáveis-de-ambiente)
 5. [Deploy para Cloudflare Pages](#deploy-para-cloudflare-pages)
 6. [Configurando o totem (kiosk)](#configurando-o-totem-kiosk)
-7. [Durante o evento](#durante-o-evento)
-8. [Painel administrativo](#painel-administrativo)
-9. [Exportando leads](#exportando-leads)
-10. [Pós-evento — conferência de dados](#pós-evento--conferência-de-dados)
+7. [Consentimento LGPD](#consentimento-lgpd)
+8. [Teclado virtual](#teclado-virtual)
+9. [Durante o evento](#durante-o-evento)
+10. [Painel administrativo](#painel-administrativo)
+11. [Exportando leads](#exportando-leads)
+12. [Pós-evento — conferência de dados](#pós-evento--conferência-de-dados)
 
 ---
 
@@ -174,6 +176,41 @@ google-chrome --kiosk https://jogo-memoria.pages.dev --no-first-run
 
 ---
 
+## Consentimento LGPD
+
+Se o arquivo `config.json` contiver o bloco `lgpd`, o participante verá uma tela de consentimento entre a splash e o formulário. Ele deve aceitar para prosseguir — o formulário não é exibido sem aceite.
+
+O que configurar:
+- `dataController`: nome da empresa responsável pelo tratamento de dados
+- `purposeText`: texto da política de privacidade (pode ser longo — o modal tem scroll)
+- `consentText`: texto dos termos de uso
+- `privacyPolicyUrl`: URL externa da política completa (opcional, abre em nova aba; deve ser `https://`)
+- `consentVersion`: versão do termo — persistida junto ao lead no Supabase
+
+Para eventos sem coleta de dados pessoais sensíveis, o bloco `lgpd` pode ser omitido.
+
+## Teclado Virtual
+
+Para uso em totem onde o teclado físico não está disponível, ative o teclado virtual:
+
+```json
+"leadForm": {
+  "virtualKeyboard": { "enabled": true },
+  ...
+}
+```
+
+O teclado virtual on-screen substitui o teclado do SO (que não sobe em Android). Suporta:
+- Layout padrão com acentos (long-press) e símbolos
+- Layout numérico para campos `tel` (`"keyboardLayout": "numeric"`)
+- Layout de e-mail com fileira de domínios comuns (`"keyboardLayout": "email"`)
+- SHIFT automático na primeira letra de campos de nome
+- Fechar ao tocar fora dos campos
+
+**Por padrão desligado** — só ative para totens onde o teclado nativo não aparece.
+
+---
+
 ## Durante o evento
 
 ### Verificações antes de abrir o evento
@@ -183,6 +220,8 @@ google-chrome --kiosk https://jogo-memoria.pages.dev --no-first-run
 - [ ] Testar o painel admin com o PIN configurado
 - [ ] Verificar se as imagens das cartas carregam
 - [ ] Testar modo offline: desativar Wi-Fi, jogar, reativar Wi-Fi e verificar sync
+- [ ] Se `lgpd` configurado: verificar que a tela de consentimento aparece e o modal de termos abre
+- [ ] Se `game.showBefore` ativo: confirmar que as cartas ficam visíveis pelo tempo configurado antes de iniciar
 
 ### Monitoramento durante o evento
 

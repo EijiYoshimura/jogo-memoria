@@ -42,8 +42,12 @@ Todo comportamento do jogo — imagens das cartas, limite de tempo, campos do fo
 ```
 Splash Screen
     ↓ (toque em qualquer lugar)
+Consentimento LGPD (se `lgpd` configurado no config.json)
+    ↓ (aceite obrigatório)
 Formulário de Lead
     ↓ (preenchimento + envio)
+Preview das cartas (se `game.showBefore` ativo — N segundos)
+    ↓
 Jogo da Memória
     ↓ (vence ou tempo esgota)
 Tela de Resultado

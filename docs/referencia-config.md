@@ -28,6 +28,7 @@ Se o arquivo estiver ausente, inacessível ou malformado, a aplicação exibe um
 | `logo` | `string` (URL) | Sim | URL da imagem do logo. Exibida na splash screen. Dimensão recomendada: 300×120 px. |
 | `primaryColor` | `string` (hex) | Sim | Cor principal da interface (botões, destaque). Formato: `#RRGGBB`. |
 | `backgroundColor` | `string` (hex) | Sim | Cor de fundo das telas. Formato: `#RRGGBB`. |
+| `accentColor` | `string` (hex) | Não | Cor de destaque (ex: amarelo em botões secundários). Formato: `#RRGGBB`. |
 
 **Exemplo:**
 ```json
@@ -53,6 +54,8 @@ Se o arquivo estiver ausente, inacessível ou malformado, a aplicação exibe um
 | `cardBack` | `string` (URL) | Sim | — | URL da imagem do verso de todas as cartas (quando ocultas). |
 | `timeLimitSeconds` | `number` (int ≥ 10) | Sim | — | Tempo limite em segundos. Exibido no timer MM:SS. Ao zerar, o jogo termina com `status: 'lost'`. |
 | `autoResetSeconds` | `number` (int) | Não | — | Segundos de espera na tela de resultado antes de voltar automaticamente para a splash. Se omitido, não há reset automático — o participante precisa tocar. |
+| `timerEnabled` | `boolean` | Não | `true` (padrão) | Se `false`, o timer não é exibido mas o limite de tempo ainda conta internamente. |
+| `showBefore` | `object` | Não | — | Se presente, exibe as cartas viradas por `seconds` segundos antes de iniciar. Estrutura: `{ "enabled": true, "seconds": 2 }` |
 
 **Exemplo:**
 ```json
@@ -68,7 +71,9 @@ Se o arquivo estiver ausente, inacessível ou malformado, a aplicação exibe um
   ],
   "cardBack": "https://cdn.exemplo.com/cards/verso.jpg",
   "timeLimitSeconds": 90,
-  "autoResetSeconds": 20
+  "autoResetSeconds": 20,
+  "timerEnabled": false,
+  "showBefore": { "enabled": true, "seconds": 2 }
 }
 ```
 
@@ -102,6 +107,7 @@ Se o arquivo estiver ausente, inacessível ou malformado, a aplicação exibe um
 | Campo | Tipo | Obrigatório | Descrição |
 |-------|------|-------------|-----------|
 | `title` | `string` | Sim | Título exibido no topo do formulário. |
+| `virtualKeyboard` | `object` | Não | Ativa o teclado virtual on-screen. Estrutura: `{ "enabled": true }`. Por padrão desligado. |
 | `fields` | `Field[]` | Sim | Lista de campos do formulário (ver abaixo). |
 
 ### `Field` — definição de campo
@@ -113,16 +119,18 @@ Se o arquivo estiver ausente, inacessível ou malformado, a aplicação exibe um
 | `type` | `'text' \| 'email' \| 'tel'` | Sim | Tipo do input HTML. Define validação nativa do browser. |
 | `required` | `boolean` | Sim | Se `true`, o formulário não pode ser enviado sem este campo preenchido. |
 | `mask` | `string` | Não | Máscara de entrada (ex: `"(99) 99999-9999"`). `9` representa qualquer dígito. |
+| `keyboardLayout` | `'default' \| 'numeric' \| 'email'` | Não | Layout do teclado virtual para este campo. Padrão: `'default'`. `numeric` para tel/pin; `email` mostra fileira de domínios. |
 
 **Exemplo:**
 ```json
 "leadForm": {
   "title": "Cadastre-se para jogar!",
+  "virtualKeyboard": { "enabled": true },
   "fields": [
     { "id": "name",    "label": "Nome completo",     "type": "text",  "required": true },
     { "id": "email",   "label": "E-mail",             "type": "email", "required": true },
     { "id": "company", "label": "Empresa",            "type": "text",  "required": false },
-    { "id": "phone",   "label": "WhatsApp",           "type": "tel",   "required": false, "mask": "(99) 99999-9999" }
+    { "id": "phone",   "label": "WhatsApp",           "type": "tel",   "required": false, "mask": "(99) 99999-9999", "keyboardLayout": "numeric" }
   ]
 }
 ```
@@ -158,6 +166,34 @@ Após 3 tentativas incorretas, o painel é bloqueado por 60 segundos.
 
 ---
 
+## `lgpd` — Consentimento LGPD (obrigatório para eventos com coleta de dados)
+
+Quando presente, exibe uma tela de consentimento entre a splash e o formulário.
+O participante deve aceitar para prosseguir.
+
+| Campo | Tipo | Obrigatório | Descrição |
+|-------|------|-------------|-----------|
+| `consentVersion` | `string` | Sim | Versão do termo (ex: `"1.0"`). Persistida no Supabase junto ao lead. |
+| `dataController` | `string` | Sim | Nome do controlador de dados exibido na tela de consentimento. |
+| `purposeText` | `string` | Sim | Texto da Política de Privacidade exibido no modal. Aceita `\n` para quebras de linha. |
+| `consentText` | `string` | Sim | Texto dos Termos de Uso exibido no modal. Aceita `\n` para quebras de linha. |
+| `privacyPolicyUrl` | `string` (URL) | Não | URL externa para a política de privacidade completa. **Deve ser `https://`** ou vazio — `javascript:` e `data:` são bloqueados. |
+| `retentionMonths` | `number` | Não | Meses de retenção dos dados (apenas informativo, exibido no texto). |
+
+**Exemplo:**
+```json
+"lgpd": {
+  "consentVersion": "1.0",
+  "dataController": "Nome da Empresa Ltda.",
+  "purposeText": "Seus dados serão usados para...",
+  "consentText": "Ao participar, você concorda com...",
+  "privacyPolicyUrl": "https://empresa.com/privacidade",
+  "retentionMonths": 12
+}
+```
+
+---
+
 ## Validação aplicada pelo ConfigLoader
 
 A aplicação valida o `config.json` na inicialização e bloqueia com mensagem de erro se:
@@ -171,6 +207,8 @@ A aplicação valida o `config.json` na inicialização e bloqueia com mensagem 
 | `game.timeLimitSeconds` | Ausente, não é número, ou < 10 |
 | `leadForm.fields` | Ausente ou não é array |
 | `adminPin` | Ausente ou não corresponde a `/^\d{4,6}$/` |
+| `lgpd.privacyPolicyUrl` | Esquema não-HTTPS (ex: `javascript:`, `data:`) — apenas `https://` ou vazio são aceitos |
+| `event.logo` | Idem — apenas `https://`, caminho relativo (`/images/...`) ou vazio são aceitos |
 
 Campos não validados (`logo`, `primaryColor`, etc.) são aceitos mesmo vazios — a aplicação simplesmente não os exibe.
 
