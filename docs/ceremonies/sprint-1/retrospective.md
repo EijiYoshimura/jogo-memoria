@@ -1,40 +1,41 @@
-# Retrospectiva — Sprint 1 — 2026-06-24
+# Retrospectiva — Sprint 1 — 2026-06-30
 
 ## Participantes
-Orchestrator, Dev Front, Tech Lead, QA, Process Auditor
+Orchestrator, Dev Front, Tech Lead, QA, Product Owner, Product Manager, Process Auditor
+
+> **Insumo:** `docs/audits/audit-2026-06-30.md` — 14 achados (2 críticos, 6 de atenção, 5 positivos, 1 otimização)
 
 ---
 
 ## O que funcionou bem
 
-- **Tech Lead atuou corretamente como guardião:** bloqueou o PR no primeiro ciclo por ausência de testes unitários — regra inviolável do CLAUDE.md cumprida mesmo sob prazo de dias
-- **Planning e grooming de alta qualidade:** interface `GameConfig`, esquema SQL, entidades de domínio e critérios de aceite detalhados documentados antes do desenvolvimento — supriram parcialmente a ausência de spec formal
-- **Isolamento arquitetural respeitado:** `src/game/` (plugin Hub-ready) separado de `src/standalone/` (casca descartável) — caminho de integração ao Hub está limpo
-- **Testes concentrados no domínio crítico:** 14 testes cobrindo `StartGame` e `FlipCard` — os dois use cases com toda a lógica de negócio
-- **Velocity excepcional:** 23/23 pts em 1 dia — meta da sprint 100% entregue dentro do prazo de urgência
-- **Documentação gerada no mesmo dia:** Daily, Review e Relatório Diário commitados em 2026-06-24
+- **Meta superada com 0 regressões:** 29 issues Done (~76pts entregues vs 23pts comprometidos) sem nenhuma regressão em produção — a expansão de escopo absorveu todos os requisitos do cliente BB Seguros sem quebrar o que já existia
+- **Todos os achados da auditoria anterior (06-24) endereçados:** specs saíram de 0 para 14 arquivos; ADRs saíram de 0 para 10; `.gitignore` corrigido; agentes atualizados; IDs consistentes nos documentos
+- **Cultura de PR estabelecida e mantida:** 95%+ dos commits de feature passaram por PR com gate verde — apenas 2 commits diretos fugiram à regra (vide "O que não funcionou")
+- **Gate quebrado → restaurado via processo correto:** quando o gate foi quebrado por commit direto em master (`15f1a5b`), a correção veio por PR (HUB-77) e não por supressão — o instinto de process-safety prevaleceu
+- **Isolamento arquitetural `src/game/`:** o domínio manteve-se limpo durante toda a expansão de escopo; a integração ao Hub permanece viável sem refatoração
+- **Teclado virtual como decisão de design:** a escolha de torná-lo configurável e reutilizável (default off, em `src/lead-capture/`) pagou dividendos ao longo de toda a sprint (HUB-57 → HUB-59 → HUB-78 → HUB-85 → HUB-86 sem reescritas)
 
 ---
 
 ## O que não funcionou
 
-- **Sem spec formal em `/docs/specs/`** antes do desenvolvimento — violação do SDD; mitigada pela qualidade do grooming, mas o artefato obrigatório estava ausente
-- **Vitest não configurado antes do primeiro PR** — dev-front submeteu PR sem infraestrutura de testes; era previsível e deveria ser parte do setup (HUB-28)
-- **Configuração de agentes incompleta antes do início:** regras de `cd` e permissões de `tee` ajustadas durante a sprint — deveriam ser pré-condição
-- **ADRs ausentes:** 7 decisões técnicas relevantes registradas apenas no grooming, não em `/docs/adr/` conforme CLAUDE.md
-- **IDs inconsistentes:** planning usou `MEM-01..09`, Linear criou `HUB-28..36` — sem mapeamento explícito
-- **`.worktrees/` não ignorado pelo git** e diretório residual rastreado após remoção do worktree
+- **Commits diretos em `master` (2 ocorrências):** `fde5f52` ("add images", 26/06) e `15f1a5b` ("some fixes", 28/06) foram aplicados sem PR. O segundo quebrou `lint+tsc+vitest`. Nenhuma convenção ou instrução de agente resolve isso com confiabilidade — apenas branch protection técnica resolve
+- **Spec criada após implementação (HUB-75/PWA):** a spec de PWA/kiosk foi commitada depois que HUB-80, HUB-81 e HUB-82 já foram mergeados — inversão do SDD que torna a spec um documento histórico em vez de contrato
+- **`docs/worktrees-ativos.md` comprometido e não entregue:** estava no plano de ação da Retro de 06-24 como ação para Sprint 2; não foi criado em nenhum momento da sprint
+- **PO/PM Sync abaixo da frequência exigida:** apenas 1 sync documentado (2026-06-24) vs mínimo de 2x por semana; em uma sprint de 7 dias isso equivale a 2 syncs esperados — apenas metade cumprida
+- **Status de HUB-56 inconsistente:** registrada como "Bloqueada (aguarda assets)" nos relatórios diários, mas marcada como Done no Linear — os commits `fde5f52` sugerem que os assets foram adicionados diretamente sem rastreamento no board
+- **Daily de encerramento (30/06) não gerado antes das atividades:** cerimônia de encerramento iniciou sem o Daily do dia, contrariando a regra "1ª atividade do dia"
 
 ---
 
 ## O que pode ser melhorado
 
-- Criar spec formal em `/docs/specs/` antes de qualquer desenvolvimento — mesmo em sprints de urgência, o grooming deve ser promovido a spec
-- Incluir configuração de Vitest no checklist de setup de projeto (HUB-28 equivalente)
-- Executar checklist de configuração de agentes antes da primeira tarefa de desenvolvimento
-- Criar ADRs no início do projeto para cada decisão técnica relevante
-- Usar os IDs do Linear no planning.md diretamente (criar issues antes do planning)
-- Adicionar `.worktrees/` ao `.gitignore` desde o `git init`
+- **Branch protection** como medida técnica irrevogável — não depender de disciplina individual para impedir commits diretos em master
+- **Spec-before-code** mesmo para features que surgem no meio da sprint — se a spec só pode ser escrita depois, é sinal de que a implementação foi prematura; criar spec rascunho antes de iniciar, mesmo que refinada depois
+- **PO/PM Sync como cerimônia agendada, não ad-hoc** — em sprints curtas (≤7 dias), 2 syncs fixos no começo e meio da sprint evitam a lacuna
+- **Status do board refletir em tempo real** — quando assets são adicionados via commit direto, o Orchestrator deve atualizar o Linear imediatamente; inconsistência entre board e código é ruído de auditoria
+- **Daily antes de qualquer atividade — inclusive cerimônias de encerramento**
 
 ---
 
@@ -42,21 +43,23 @@ Orchestrator, Dev Front, Tech Lead, QA, Process Auditor
 
 | # | Melhoria | Responsável | Tipo | Prazo |
 |---|----------|-------------|------|-------|
-| 1 | Criar spec formal de `jogo-memoria` em `/docs/specs/` (backfill Sprint 1) | Tech Lead + PO | processo | Imediato — nesta retro |
-| 2 | Criar ADRs para as 7 decisões técnicas da Sprint 1 | Tech Lead | processo | Imediato — nesta retro |
-| 3 | Adicionar `.worktrees/` ao `.gitignore` e remover diretório residual | Orchestrator | código | Imediato — nesta retro |
-| 4 | Atualizar `dev-front.md`: incluir Vitest no checklist de setup de projeto | Orchestrator | agente | Imediato — nesta retro |
-| 5 | Atualizar `orchestrator.md`: criar issues no Linear ANTES do planning.md | Orchestrator | agente | Imediato — nesta retro |
-| 6 | Criar `docs/worktrees-ativos.md` e mantê-lo durante a sprint | Orchestrator | processo | Sprint 2 |
-| 7 | Checklist pré-sprint de agentes (permissões, `.gitignore`, Vitest) | Orchestrator | processo | Sprint 2 |
+| 1 | Ativar branch protection no GitHub: require PR + status checks em `master` | Orchestrator | processo | **Nesta retro — imediato** |
+| 2 | Corrigir status de HUB-56 no Linear para refletir o estado real (Done ou Bloqueada) | Orchestrator | processo | **Nesta retro — imediato** |
+| 3 | Gerar Daily de 30/06 retroativamente | Orchestrator | processo | **Nesta retro — imediato** |
+| 4 | Criar `docs/worktrees-ativos.md` no início da próxima sprint (comprometido desde 06-24) | Orchestrator | processo | Início da Sprint 2 |
+| 5 | Agendar PO/PM Sync fixo 2x/semana no início da próxima sprint | Orchestrator + PO + PM | processo | Início da Sprint 2 |
+| 6 | Criar spec rascunho antes de iniciar feature emergente — mesmo que aprovada retroativamente | Tech Lead + PO | processo | Sprint 2 |
 
 ## Itens aplicados nesta retro
-- `docs/specs/jogo-memoria.md` criado (backfill)
-- `docs/adr/` criado com ADRs das 7 decisões técnicas da Sprint 1
-- `.worktrees/` adicionado ao `.gitignore`
-- `dev-front.md` atualizado: Vitest no checklist de setup
-- `orchestrator.md` atualizado: issues no Linear antes do planning
+
+- `docs/ceremonies/sprint-1/review.md` atualizado com todas as 29 issues Done (+ 2 pendentes)
+- `docs/audits/audit-2026-06-30.md` gerado e commitado pelo process-auditor
+- Branch protection: **a ser ativada pelo operador no GitHub** (não automatizável via CLI neste contexto)
+- Status de HUB-56 no Linear: **a verificar e corrigir** (operador confirma se assets foram entregues)
 
 ## Itens pendentes para a próxima sprint
-- Criar `docs/worktrees-ativos.md` ao iniciar Sprint 2
-- Aplicar checklist pré-sprint completo antes do primeiro desenvolvimento
+
+- Criar `docs/worktrees-ativos.md` como primeiro artefato da Sprint 2
+- PO/PM Sync 2x/semana — agenda fixa, não ad-hoc
+- Daily como primeira atividade irrevogável — inclusive nos dias de cerimônia
+- Spec-before-code para features emergentes: rascunho antes, refinamento depois, nunca após o merge
