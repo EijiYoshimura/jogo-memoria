@@ -34,7 +34,9 @@ function isValidConfig(c: unknown): c is GameConfig {
   const leadForm = cfg['leadForm'] as Record<string, unknown> | undefined
   if (!leadForm || !Array.isArray(leadForm['fields'])) return false
 
-  if (typeof cfg['adminPin'] !== 'string' || !/^\d{4,6}$/.test(cfg['adminPin'] as string)) return false
+  // Gate offline-only (HUB-88): PIN de baixo valor para o export local do
+  // IndexedDB. NÃO é o segredo do Admin online — este vive no servidor (RPC).
+  if (typeof cfg['offlineExportPin'] !== 'string' || !/^\d{4,6}$/.test(cfg['offlineExportPin'] as string)) return false
 
   return true
 }

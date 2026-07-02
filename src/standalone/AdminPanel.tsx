@@ -1,29 +1,35 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import type { GameConfig } from '../game/types'
 import { getAllLeads, getPendingLeads } from './lib/leadsDb'
 import { syncPendingLeads } from './lib/leadsSync'
-import { supabase } from './lib/supabaseClient'
+import { listAdminLeads, type RemoteLead } from './lib/adminLeads'
+import { buildLeadsCsv } from './lib/leadsCsv'
 
 interface AdminPanelProps {
   config: GameConfig
   onClose: () => void
 }
 
-type PanelView = 'pin' | 'dashboard'
+type PanelView = 'secret' | 'dashboard'
+type DashboardMode = 'online' | 'offline'
 
 const MAX_ATTEMPTS = 3
 const LOCKOUT_SECONDS = 60
-const PIN_LENGTH = 4
 
 export function AdminPanel({ config, onClose }: AdminPanelProps) {
-  const [view, setView] = useState<PanelView>('pin')
-  const [pin, setPin] = useState('')
+  const [view, setView] = useState<PanelView>('secret')
+  const [mode, setMode] = useState<DashboardMode>('online')
+  const [secretInput, setSecretInput] = useState('')
+  const [authSecret, setAuthSecret] = useState('')
+  const [isAuthenticating, setIsAuthenticating] = useState(false)
+  const [authError, setAuthError] = useState<string | null>(null)
   const [attempts, setAttempts] = useState(0)
   const [lockedUntil, setLockedUntil] = useState<number | null>(null)
   const [lockCountdown, setLockCountdown] = useState(0)
-  const [totalLeads, setTotalLeads] = useState(0)
+  const [remoteLeads, setRemoteLeads] = useState<RemoteLead[]>([])
   const [syncedLeads, setSyncedLeads] = useState(0)
   const [pendingLeads, setPendingLeads] = useState(0)
+  const [totalLeads, setTotalLeads] = useState(0)
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncMessage, setSyncMessage] = useState('')
   const [statsError, setStatsError] = useState<string | null>(null)
@@ -44,113 +50,113 @@ export function AdminPanel({ config, onClose }: AdminPanelProps) {
     return () => clearInterval(interval)
   }, [lockedUntil])
 
-  const loadStats = useCallback(async () => {
-    setStatsError(null)
-    const pending = await getPendingLeads()
-    setPendingLeads(pending.length)
-
-    const { count, error } = await supabase
-      .from('leads')
-      .select('*', { count: 'exact', head: true })
-      .eq('event_id', config.event.id)
-
-    if (error) {
-      setStatsError(`Erro ao consultar Supabase: ${error.message}. Verifique a política RLS (SELECT para anon).`)
-      return
-    }
-
-    const syncedCount = count ?? 0
-    setSyncedLeads(syncedCount)
-    setTotalLeads(syncedCount + pending.length)
-  }, [config.event.id])
-
-  useEffect(() => {
-    if (view === 'dashboard') {
-      loadStats()
-    }
-  }, [view, loadStats])
-
-  function handleDigit(digit: string) {
-    if (lockedUntil) return
-    if (pin.length >= PIN_LENGTH) return
-    const next = pin + digit
-    setPin(next)
-
-    if (next.length === PIN_LENGTH) {
-      if (next === config.adminPin) {
-        setPin('')
-        setView('dashboard')
-      } else {
-        const newAttempts = attempts + 1
-        setAttempts(newAttempts)
-        setPin('')
-        if (newAttempts >= MAX_ATTEMPTS) {
-          setLockedUntil(Date.now() + LOCKOUT_SECONDS * 1000)
-          setLockCountdown(LOCKOUT_SECONDS)
-        }
-      }
+  function registerFailedAttempt(message: string) {
+    const nextAttempts = attempts + 1
+    setAttempts(nextAttempts)
+    setSecretInput('')
+    setAuthError(message)
+    if (nextAttempts >= MAX_ATTEMPTS) {
+      setLockedUntil(Date.now() + LOCKOUT_SECONDS * 1000)
+      setLockCountdown(LOCKOUT_SECONDS)
     }
   }
 
-  function handleBackspace() {
-    setPin((prev) => prev.slice(0, -1))
+  async function computeCounts(remote: RemoteLead[]) {
+    const pending = await getPendingLeads()
+    setSyncedLeads(remote.length)
+    setPendingLeads(pending.length)
+    setTotalLeads(remote.length + pending.length)
+  }
+
+  async function enterOnline(secret: string, leads: RemoteLead[]) {
+    setAuthSecret(secret)
+    setRemoteLeads(leads)
+    setMode('online')
+    setView('dashboard')
+    await computeCounts(leads)
+  }
+
+  async function enterOffline() {
+    const all = await getAllLeads()
+    setRemoteLeads([])
+    setPendingLeads(all.filter((lead) => !lead.synced).length)
+    setTotalLeads(all.length)
+    setMode('offline')
+    setView('dashboard')
+  }
+
+  async function handleOnlineUnlock(secret: string) {
+    setIsAuthenticating(true)
+    try {
+      const result = await listAdminLeads(config.event.id, secret)
+      if (result.status === 'authorized') {
+        setAuthError(null)
+        setAttempts(0)
+        setSecretInput('')
+        await enterOnline(secret, result.leads)
+      } else if (result.status === 'unauthorized') {
+        registerFailedAttempt('Senha incorreta.')
+      } else {
+        setAuthError('Sem conexão. Use o PIN de export offline para os leads locais.')
+      }
+    } catch (err: unknown) {
+      const detail = err instanceof Error ? err.message : 'erro desconhecido'
+      setAuthError(`Falha ao autorizar: ${detail}`)
+    } finally {
+      setIsAuthenticating(false)
+    }
+  }
+
+  async function handleSubmit() {
+    if (lockedUntil || isAuthenticating) return
+    const secret = secretInput
+    if (secret.length === 0) return
+
+    if (!navigator.onLine) {
+      if (secret === config.offlineExportPin) {
+        setAuthError(null)
+        setAttempts(0)
+        setSecretInput('')
+        await enterOffline()
+      } else {
+        registerFailedAttempt('PIN de export offline incorreto.')
+      }
+      return
+    }
+
+    await handleOnlineUnlock(secret)
   }
 
   async function handleForceSync() {
     setIsSyncing(true)
     setSyncMessage('')
-    await syncPendingLeads()
-    await loadStats()
-    setIsSyncing(false)
-    setSyncMessage('Sincronização concluída.')
+    try {
+      await syncPendingLeads()
+      const result = await listAdminLeads(config.event.id, authSecret)
+      if (result.status === 'authorized') {
+        setStatsError(null)
+        setRemoteLeads(result.leads)
+        await computeCounts(result.leads)
+      } else if (result.status === 'unauthorized') {
+        setStatsError('Sessão expirou. Reabra o painel e informe a senha novamente.')
+      } else {
+        setStatsError('Sem conexão para atualizar os sincronizados.')
+      }
+      setSyncMessage('Sincronização concluída.')
+    } catch (err: unknown) {
+      const detail = err instanceof Error ? err.message : 'erro desconhecido'
+      setStatsError(`Falha ao sincronizar: ${detail}`)
+    } finally {
+      setIsSyncing(false)
+    }
   }
 
   async function handleExportCsv() {
-    const localLeads = await getAllLeads()
-    const localPending = localLeads.filter((l) => !l.synced)
-
-    const { data: remoteLeads } = await supabase
-      .from('leads')
-      .select('*')
-      .eq('event_id', config.event.id)
-
-    const fieldIds = config.leadForm.fields.map((f) => f.id)
-    const fieldLabels = config.leadForm.fields.map((f) => f.label)
-    const fixedHeaders = ['played_at', 'score', 'time_taken', 'synced_from']
-    const headers = [...fieldLabels, ...fixedHeaders]
-
-    const rows: string[][] = []
-
-    if (remoteLeads) {
-      for (const lead of remoteLeads) {
-        const row = [
-          ...fieldIds.map((id) => (lead.data as Record<string, string>)[id] ?? ''),
-          lead.played_at ?? '',
-          String(lead.score ?? ''),
-          String(lead.time_taken ?? ''),
-          lead.synced_from ?? 'online',
-        ]
-        rows.push(row)
-      }
-    }
-
-    for (const lead of localPending) {
-      const row = [
-        ...fieldIds.map((id) => lead.data[id] ?? ''),
-        lead.playedAt,
-        String(lead.score),
-        String(lead.timeTaken),
-        'offline-sync',
-      ]
-      rows.push(row)
-    }
-
-    const csvContent = [
-      headers.join(','),
-      ...rows.map((row) =>
-        row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')
-      ),
-    ].join('\n')
+    const allLocal = await getAllLeads()
+    const csvContent =
+      mode === 'online'
+        ? buildLeadsCsv(config, remoteLeads, allLocal.filter((lead) => !lead.synced))
+        : buildLeadsCsv(config, [], allLocal)
 
     const today = new Date().toISOString().slice(0, 10)
     const filename = `leads-${config.event.id}-${today}.csv`
@@ -165,67 +171,62 @@ export function AdminPanel({ config, onClose }: AdminPanelProps) {
     URL.revokeObjectURL(url)
   }
 
-  if (view === 'pin') {
+  if (view === 'secret') {
+    const offline = typeof navigator !== 'undefined' && !navigator.onLine
     return (
       <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50">
-        <div className="bg-gray-900 rounded-2xl p-8 w-80 flex flex-col items-center gap-6">
+        <form
+          className="bg-gray-900 rounded-2xl p-8 w-96 flex flex-col items-center gap-5"
+          onSubmit={(e) => {
+            e.preventDefault()
+            void handleSubmit()
+          }}
+        >
           <h2 className="text-white text-2xl font-bold">Admin</h2>
 
-          <div className="flex gap-3">
-            {Array.from({ length: PIN_LENGTH }).map((_, i) => (
-              <div
-                key={i}
-                className={`w-5 h-5 rounded-full border-2 ${
-                  i < pin.length ? 'bg-purple-500 border-purple-500' : 'border-gray-500'
-                }`}
-              />
-            ))}
-          </div>
+          <p className="text-gray-300 text-sm text-center">
+            {offline
+              ? 'Sem conexão — informe o PIN de export offline (leads locais deste dispositivo).'
+              : 'Informe a senha do painel para acessar os leads do evento.'}
+          </p>
+
+          <input
+            type="password"
+            className="w-full bg-gray-800 text-white text-center text-xl rounded-xl py-3 px-4 outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-40"
+            value={secretInput}
+            aria-label={offline ? 'PIN de export offline' : 'Senha do painel admin'}
+            autoComplete="off"
+            autoFocus
+            disabled={!!lockedUntil || isAuthenticating}
+            onChange={(e) => setSecretInput(e.target.value)}
+          />
 
           {lockedUntil ? (
-            <p className="text-red-400 text-center">
-              Bloqueado por {lockCountdown}s
-            </p>
+            <p className="text-red-400 text-center">Bloqueado por {lockCountdown}s</p>
           ) : (
-            attempts > 0 && (
-              <p className="text-red-400 text-sm">
-                PIN incorreto. Tentativa {attempts}/{MAX_ATTEMPTS}
-              </p>
-            )
+            authError && <p className="text-red-400 text-sm text-center">{authError}</p>
+          )}
+          {!lockedUntil && attempts > 0 && (
+            <p className="text-gray-400 text-xs">
+              Tentativa {attempts}/{MAX_ATTEMPTS}
+            </p>
           )}
 
-          <div className="grid grid-cols-3 gap-3 w-full">
-            {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
-              <button
-                key={digit}
-                className="bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-white text-2xl font-bold rounded-xl py-4 transition-colors disabled:opacity-40"
-                disabled={!!lockedUntil}
-                onClick={() => handleDigit(digit)}
-              >
-                {digit}
-              </button>
-            ))}
-            <button
-              className="bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-white text-lg rounded-xl py-4 transition-colors"
-              onClick={onClose}
-            >
-              Sair
-            </button>
-            <button
-              className="bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-white text-2xl font-bold rounded-xl py-4 transition-colors disabled:opacity-40"
-              disabled={!!lockedUntil}
-              onClick={() => handleDigit('0')}
-            >
-              0
-            </button>
-            <button
-              className="bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-white text-lg rounded-xl py-4 transition-colors"
-              onClick={handleBackspace}
-            >
-              ←
-            </button>
-          </div>
-        </div>
+          <button
+            type="submit"
+            className="w-full bg-purple-600 hover:bg-purple-500 active:bg-purple-700 text-white text-lg font-bold rounded-xl py-3 transition-colors disabled:opacity-40"
+            disabled={!!lockedUntil || isAuthenticating || secretInput.length === 0}
+          >
+            {isAuthenticating ? 'Verificando...' : 'Entrar'}
+          </button>
+          <button
+            type="button"
+            className="w-full bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-white text-lg rounded-xl py-3 transition-colors"
+            onClick={onClose}
+          >
+            Sair
+          </button>
+        </form>
       </div>
     )
   }
@@ -233,6 +234,13 @@ export function AdminPanel({ config, onClose }: AdminPanelProps) {
   return (
     <div className="fixed inset-0 bg-gray-900 flex flex-col p-8 z-50 overflow-y-auto">
       <h2 className="text-white text-3xl font-bold mb-6">Painel Admin</h2>
+
+      {mode === 'offline' && (
+        <div className="bg-yellow-900 border border-yellow-500 rounded-xl p-4 mb-6 text-yellow-200 text-sm">
+          Modo offline: exibindo apenas os leads locais deste dispositivo. Os
+          totais sincronizados ficam indisponíveis sem conexão.
+        </div>
+      )}
 
       {statsError && (
         <div className="bg-red-900 border border-red-500 rounded-xl p-4 mb-6 text-red-200 text-sm">
@@ -242,12 +250,18 @@ export function AdminPanel({ config, onClose }: AdminPanelProps) {
 
       <div className="grid grid-cols-3 gap-4 mb-8">
         <div className="bg-gray-800 rounded-xl p-4 text-center">
-          <p className="text-gray-400 text-sm">Total de leads</p>
+          <p className="text-gray-400 text-sm">
+            {mode === 'offline' ? 'Total local' : 'Total de leads'}
+          </p>
           <p className="text-white text-4xl font-bold">{totalLeads}</p>
         </div>
         <div className="bg-gray-800 rounded-xl p-4 text-center">
           <p className="text-gray-400 text-sm">Sincronizados</p>
-          <p className="text-green-400 text-4xl font-bold">{syncedLeads}</p>
+          {mode === 'offline' ? (
+            <p className="text-gray-500 text-lg font-bold mt-3">indisponível offline</p>
+          ) : (
+            <p className="text-green-400 text-4xl font-bold">{syncedLeads}</p>
+          )}
         </div>
         <div className="bg-gray-800 rounded-xl p-4 text-center">
           <p className="text-gray-400 text-sm">Pendentes</p>
@@ -255,9 +269,7 @@ export function AdminPanel({ config, onClose }: AdminPanelProps) {
         </div>
       </div>
 
-      {syncMessage && (
-        <p className="text-green-400 mb-4">{syncMessage}</p>
-      )}
+      {syncMessage && <p className="text-green-400 mb-4">{syncMessage}</p>}
 
       <div className="flex flex-col gap-4">
         <button
@@ -266,13 +278,15 @@ export function AdminPanel({ config, onClose }: AdminPanelProps) {
         >
           Exportar CSV
         </button>
-        <button
-          className="bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white text-xl font-bold rounded-xl py-4 transition-colors disabled:opacity-50"
-          disabled={isSyncing}
-          onClick={handleForceSync}
-        >
-          {isSyncing ? 'Sincronizando...' : 'Forçar Sync'}
-        </button>
+        {mode === 'online' && (
+          <button
+            className="bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white text-xl font-bold rounded-xl py-4 transition-colors disabled:opacity-50"
+            disabled={isSyncing}
+            onClick={handleForceSync}
+          >
+            {isSyncing ? 'Sincronizando...' : 'Forçar Sync'}
+          </button>
+        )}
         <button
           className="bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-white text-xl font-bold rounded-xl py-4 transition-colors"
           onClick={onClose}

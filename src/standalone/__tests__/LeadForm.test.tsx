@@ -24,7 +24,7 @@ function makeConfig(virtualKeyboardEnabled?: boolean): GameConfig {
         { id: 'phone', label: 'WhatsApp', type: 'tel', required: false, mask: '(99) 99999-9999' },
       ],
     },
-    adminPin: '1234',
+    offlineExportPin: '1234',
   }
 }
 

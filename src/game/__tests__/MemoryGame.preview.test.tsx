@@ -36,7 +36,7 @@ function makeConfig(options?: {
       ...(options?.showBefore === undefined ? {} : { showBefore: options.showBefore }),
     },
     leadForm: { title: 't', fields: [] },
-    adminPin: '1234',
+    offlineExportPin: '1234',
   }
 }
 

@@ -81,7 +81,13 @@
   },
 
   // --- Painel administrativo (export de leads) ------------------------------
-  "adminPin": "1234",                      // PIN de acesso ao painel admin (export CSV). TROQUE por um valor real e secreto.
+  // A SENHA DO ADMIN ONLINE NÃO FICA AQUI (HUB-88). Ela é verificada no servidor
+  // (Supabase, RPC admin_list_leads) e NUNCA entra em nenhum artefato público —
+  // semeie o hash dela no SQL Editor (ver docs/services-checklist.md).
+  //
+  // O campo abaixo é APENAS o gate offline do export local (IndexedDB deste
+  // dispositivo), de baixo valor e SEM relação com a senha online. 4 a 6 dígitos.
+  "offlineExportPin": "1234",              // PIN do export offline (leads locais). Distinto da senha online. TROQUE por evento.
 
   // --- LGPD: consentimento e retenção ---------------------------------------
   // OPCIONAL, mas FORTEMENTE recomendado para captação de dados em evento no Brasil.
