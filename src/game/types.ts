@@ -50,7 +50,15 @@ export interface GameConfig {
       keyboardLayout?: string
     }>
   }
-  adminPin: string
+  /**
+   * PIN de gate do export local offline (HUB-88). Gate **apenas de UI**, de
+   * baixo valor: protege o export do IndexedDB do próprio dispositivo quando
+   * `navigator.onLine` é `false`. NÃO é o segredo do Admin online — este vive
+   * apenas no servidor (RPC `admin_list_leads`, ver ADR-012) e nunca aparece em
+   * nenhum artefato baixado pelo cliente. Deve ser um valor **distinto e sem
+   * relação** com a passphrase online. Validação: 4 a 6 dígitos numéricos.
+   */
+  offlineExportPin: string
   lgpd?: {
     consentVersion: string
     dataController: string

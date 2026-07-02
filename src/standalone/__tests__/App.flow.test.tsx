@@ -21,7 +21,7 @@ vi.mock('../ConfigLoader', () => ({
       title: 'Preencha seus dados',
       fields: [{ id: 'name', label: 'Nome completo', type: 'text', required: true }],
     },
-    adminPin: '1234',
+    offlineExportPin: '1234',
   }),
 }))
 

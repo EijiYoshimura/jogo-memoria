@@ -67,9 +67,14 @@ Exemplo completo:
       { "id": "phone", "label": "WhatsApp", "type": "tel", "required": false, "mask": "(99) 99999-9999" }
     ]
   },
-  "adminPin": "9182"
+  "offlineExportPin": "9182"
 }
 ```
+
+> **Senha do Admin online (HUB-88):** ela **não** vai no `config.json`. É verificada no
+> servidor (Supabase) e semeada uma vez por evento no SQL Editor — ver
+> [Segurança do Admin](#segredo-do-admin-online-e-gate-offline) abaixo. O `offlineExportPin`
+> do `config.json` é apenas o gate do export **offline** local, um valor distinto e de baixo valor.
 
 Ver [Referência de Configuração](referencia-config.md) para descrição completa de cada campo.
 
@@ -217,7 +222,8 @@ O teclado virtual on-screen substitui o teclado do SO (que não sobe em Android)
 
 - [ ] Acessar a URL e confirmar que a splash screen aparece
 - [ ] Preencher o formulário com dados de teste e confirmar que chega no Supabase
-- [ ] Testar o painel admin com o PIN configurado
+- [ ] Confirmar que a senha do Admin online foi semeada no Supabase (SQL Editor) e testar o login do painel online
+- [ ] Testar o export offline: desativar Wi-Fi, abrir o painel e destravar com o `offlineExportPin`
 - [ ] Verificar se as imagens das cartas carregam
 - [ ] Testar modo offline: desativar Wi-Fi, jogar, reativar Wi-Fi e verificar sync
 - [ ] Se `lgpd` configurado: verificar que a tela de consentimento aparece e o modal de termos abre
@@ -239,13 +245,34 @@ Se houver muitos pendentes, acione **Forçar Sync** assim que a internet estiver
 
 ### Como acessar
 
-Na splash screen, toque **5 vezes no logo do evento em menos de 3 segundos**. A tela de PIN aparece.
+Na splash screen, toque **5 vezes no logo do evento em menos de 3 segundos**. A tela de entrada aparece.
 
-### PIN
+### Segredo do Admin online e gate offline
 
-Definido no campo `adminPin` do `config.json`. Deve ser 4 a 6 dígitos numéricos.
+A partir de HUB-88 (ver ADR-012), existem **dois segredos distintos e sem relação entre si**:
 
-Após 3 tentativas incorretas, o painel fica **bloqueado por 60 segundos**.
+| Segredo | Onde vive | Protege | Como configurar |
+|---------|-----------|---------|-----------------|
+| **Senha do Admin online** | Só no servidor (Supabase, hash bcrypt) — **nunca** no `config.json` | A leitura remota dos leads do evento (contagem + export CSV online), via RPC `admin_list_leads` | Semear o hash **1x por evento** no SQL Editor — ver `docs/services-checklist.md`, seção "Segurança de leitura do Admin (HUB-88)" |
+| **`offlineExportPin`** | `config.json` (público) | Apenas o export **offline** dos leads locais do IndexedDB (quando o totem está sem internet) | Campo `offlineExportPin` do `config.json`, 4 a 6 dígitos |
+
+**Como o painel decide qual usar:**
+
+- **Com internet** (`navigator.onLine`): a tela pede a **senha do Admin online**. Ela é enviada
+  ao servidor; se estiver correta, o painel abre com os leads do evento (contagem e CSV vêm de
+  uma única leitura autorizada). Senha errada ⇒ "Senha incorreta".
+- **Sem internet:** a tela pede o **`offlineExportPin`**. Ele destrava só o export dos leads
+  **locais deste dispositivo**; os cards de "Sincronizados" ficam indisponíveis offline.
+
+> **Por que a senha online não fica no `config.json`?** Porque o `config.json` é público
+> (`GET /config.json`) e a `anon key` está no bundle — qualquer PIN ali seria lido por qualquer
+> um. A verificação server-side garante que só quem tem a senha correta lê os leads. Use uma
+> **passphrase longa** (≥ 12 caracteres) e guarde-a em cofre/gerenciador de senhas.
+
+Após 3 tentativas incorretas, a entrada fica **bloqueada por 60 segundos**.
+
+> **Migração:** o antigo `adminPin` (ex.: `3314`) foi removido e está queimado. Semeie uma
+> **nova** senha online no Supabase e defina um `offlineExportPin` distinto — nunca reutilize o `3314`.
 
 ### Funcionalidades
 
@@ -263,8 +290,11 @@ Após 3 tentativas incorretas, o painel fica **bloqueado por 60 segundos**.
 
 O botão **Exportar CSV** no painel admin gera um arquivo com:
 
-- Todos os leads recebidos do Supabase (filtrados por `event.id`)
-- Leads pendentes do IndexedDB local (ainda não sincronizados)
+- **Painel online** (destravado com a senha do Admin): todos os leads do evento retornados
+  pelo servidor (leitura autorizada, filtrada por `event.id`) + leads pendentes do IndexedDB
+  local ainda não sincronizados.
+- **Painel offline** (destravado com o `offlineExportPin`): apenas os leads presentes no
+  IndexedDB **deste dispositivo** — a leitura remota não está disponível sem internet.
 
 O arquivo é nomeado: `leads-{event.id}-{YYYY-MM-DD}.csv`
 

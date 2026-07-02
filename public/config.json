@@ -51,7 +51,7 @@
       }
     ]
   },
-  "adminPin": "3314",
+  "offlineExportPin": "4720",
   "lgpd": {
     "consentVersion": "1.0",
     "dataController": "BB Seguros",
