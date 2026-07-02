@@ -39,7 +39,7 @@ function makeConfig(timerEnabled?: boolean): GameConfig {
       ...(timerEnabled === undefined ? {} : { timerEnabled }),
     },
     leadForm: { title: 't', fields: [] },
-    adminPin: '1234',
+    offlineExportPin: '1234',
   }
 }
 

@@ -14,7 +14,7 @@ const baseConfig: GameConfig = {
   },
   game: { pairs: 6, cardImages: [], cardBack: '', timeLimitSeconds: 60 },
   leadForm: { title: 'Preencha seus dados', fields: [] },
-  adminPin: '1234',
+  offlineExportPin: '1234',
   lgpd: {
     consentVersion: '1.0',
     dataController: 'Evento Demo Ltda',

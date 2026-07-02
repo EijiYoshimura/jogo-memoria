@@ -1,0 +1,89 @@
+import { describe, it, expect } from 'vitest'
+import { buildLeadsCsv } from '../leadsCsv'
+import type { GameConfig } from '../../../game/types'
+import type { LocalLead } from '../leadsDb'
+import type { RemoteLead } from '../adminLeads'
+
+function makeConfig(): GameConfig {
+  return {
+    event: {
+      id: 'evento-demo-2026',
+      name: 'Evento',
+      logo: '',
+      primaryColor: '#000',
+      backgroundColor: '#fff',
+    },
+    game: { pairs: 6, cardImages: [], cardBack: '', timeLimitSeconds: 60 },
+    leadForm: {
+      title: 'Preencha',
+      fields: [
+        { id: 'name', label: 'Nome', type: 'text', required: true },
+        { id: 'email', label: 'E-mail', type: 'email', required: true },
+      ],
+    },
+    offlineExportPin: '1234',
+  }
+}
+
+const remote: RemoteLead = {
+  event_id: 'evento-demo-2026',
+  data: { name: 'Ana', email: 'ana@example.com' },
+  score: 6,
+  time_taken: 42,
+  played_at: '2026-07-02T12:00:00Z',
+  synced_from: 'online',
+}
+
+const local: LocalLead = {
+  eventId: 'evento-demo-2026',
+  data: { name: 'Bruno', email: 'bruno@example.com' },
+  score: 4,
+  timeTaken: 55,
+  playedAt: '2026-07-02T13:00:00Z',
+  synced: false,
+  consentedAt: '2026-07-02T13:00:00Z',
+  consentVersion: '1.0',
+}
+
+describe('buildLeadsCsv', () => {
+  it('gera cabeçalho com labels dos campos + colunas fixas', () => {
+    const csv = buildLeadsCsv(makeConfig(), [], [])
+    expect(csv).toBe('Nome,E-mail,played_at,score,time_taken,synced_from')
+  })
+
+  it('inclui linhas remotas e locais na ordem remoto → local', () => {
+    const csv = buildLeadsCsv(makeConfig(), [remote], [local])
+    const lines = csv.split('\n')
+    expect(lines).toHaveLength(3)
+    expect(lines[1]).toBe(
+      '"Ana","ana@example.com","2026-07-02T12:00:00Z","6","42","online"'
+    )
+    expect(lines[2]).toBe(
+      '"Bruno","bruno@example.com","2026-07-02T13:00:00Z","4","55","offline-sync"'
+    )
+  })
+
+  it('trata score/time_taken nulos e campo ausente como célula vazia', () => {
+    const partial: RemoteLead = {
+      event_id: 'evento-demo-2026',
+      data: { name: 'Sem Email' },
+      score: null,
+      time_taken: null,
+      played_at: null,
+      synced_from: null,
+    }
+    const csv = buildLeadsCsv(makeConfig(), [partial], [])
+    const lines = csv.split('\n')
+    // synced_from nulo cai no fallback "online"
+    expect(lines[1]).toBe('"Sem Email","","","","","online"')
+  })
+
+  it('escapa aspas duplicando-as (proteção de CSV)', () => {
+    const tricky: RemoteLead = {
+      ...remote,
+      data: { name: 'Ana "A"', email: 'ana@example.com' },
+    }
+    const csv = buildLeadsCsv(makeConfig(), [tricky], [])
+    expect(csv.split('\n')[1]).toContain('"Ana ""A"""')
+  })
+})
