@@ -1,7 +1,7 @@
 # Checklist de Serviços — Jogo de Memória
 
 > Ações que você (operador/dono do projeto) precisa executar nos serviços externos para que a aplicação esteja pronta para produção.
-> Última atualização: 2026-06-24
+> Última atualização: 2026-07-02
 
 ---
 
@@ -56,6 +56,10 @@ CREATE POLICY "anon insert only"
 >   ADD COLUMN IF NOT EXISTS consented_at   timestamptz,
 >   ADD COLUMN IF NOT EXISTS consent_version text;
 > ```
+
+> **HUB-87 (CPF antifraude):** a migração de CPF (colunas dedicadas + índice + RPC
+> `check_cpf_participation`) tem seção própria — ver **"Antifraude de CPF (HUB-87 / ADR-011)"**
+> mais abaixo. É 100% aditiva e idempotente; roda tanto em tabela nova quanto existente.
 
 - [ ] **Copiar as credenciais** em Project Settings → API:
   - `Project URL` → valor de `VITE_SUPABASE_URL`
@@ -159,6 +163,118 @@ DROP POLICY IF EXISTS "anon select" ON leads;
 
 **Rotação da senha:** rode novamente o bloco de semear (`ON CONFLICT ... DO UPDATE`) com a nova
 passphrase. O valor antigo `3314` do PIN público está **queimado** e não deve ser reutilizado.
+
+### Antifraude de CPF (HUB-87 / ADR-011)
+
+**Por quê:** a ativação é vinculada a sorteio/prêmio. Para impedir que o mesmo CPF jogue além do
+limite configurado (`leadForm.maxParticipations`), o formulário passa a validar o CPF e consultar
+**online** quantas vezes aquele CPF já participou **daquele evento**. O CPF vira coluna dedicada
+(habilita dedup e contagem eficiente) e a contagem é feita por uma RPC `SECURITY DEFINER` que
+devolve um **contrato de rede mínimo** — só `{participation_count, last_lead_data}`, nunca a linha
+inteira nem CPFs de terceiros. Ver `docs/adr/ADR-011-cpf-antifraude-rpc-dedup.md`.
+
+> ✅ **100% aditivo e idempotente.** Diferente do HUB-88, esta migração **não** remove policies nem
+> altera o fluxo de INSERT — só adiciona colunas, índice e a RPC. Pode ser re-executada sem efeito
+> colateral e **não** exige ordem de rollout com o deploy do cliente (o wiring de frontend é HUB-91/92).
+> A RPC é `SECURITY DEFINER`: roda com o privilégio do owner e **independe** da policy de `SELECT` do
+> `anon` — continua funcionando mesmo com o SELECT anônimo já fechado pelo HUB-88.
+
+**Rode o bloco inteiro no SQL Editor do Supabase:**
+
+```sql
+-- ── HUB-87 / ADR-011 — Antifraude de CPF (aditivo, idempotente) ───────────────
+
+-- 1) Colunas dedicadas de CPF na tabela leads.
+--    cpf                          : 11 dígitos normalizados (só números), sem UNIQUE
+--                                   (cada jogada continua gerando uma linha; a contagem é por COUNT).
+--    cpf_check_skipped            : true quando a checagem online não concluiu em 3s (fallback offline).
+--    max_participations_at_submit : snapshot do limite vigente naquela jogada (para a reconciliação).
+ALTER TABLE leads
+  ADD COLUMN IF NOT EXISTS cpf                          text,
+  ADD COLUMN IF NOT EXISTS cpf_check_skipped            boolean DEFAULT false,
+  ADD COLUMN IF NOT EXISTS max_participations_at_submit integer;
+
+-- 2) CHECK de formato — defesa em profundidade: 11 dígitos numéricos, ou NULL (leads legados).
+--    Postgres não tem "ADD CONSTRAINT IF NOT EXISTS"; a guarda por pg_constraint mantém a
+--    re-execução idempotente sem alterar o nome nem o predicado da constraint.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'leads_cpf_format_chk'
+  ) THEN
+    ALTER TABLE leads
+      ADD CONSTRAINT leads_cpf_format_chk
+      CHECK (cpf IS NULL OR cpf ~ '^[0-9]{11}$');
+  END IF;
+END$$;
+
+-- 3) Índice composto (event_id, cpf) — toda contagem de participação filtra pelos dois.
+--    Parcial (WHERE cpf IS NOT NULL): não indexa linhas antigas sem CPF.
+CREATE INDEX IF NOT EXISTS idx_leads_event_cpf
+  ON leads (event_id, cpf)
+  WHERE cpf IS NOT NULL;
+
+-- 4) RPC de dedup/contagem — SECURITY DEFINER, retorno mínimo, search_path fixo (mitiga
+--    search_path hijacking). O cliente chama via supabase.rpc('check_cpf_participation', ...).
+CREATE OR REPLACE FUNCTION public.check_cpf_participation(
+  p_event_id text,
+  p_cpf      text
+)
+RETURNS TABLE (
+  participation_count integer,
+  last_lead_data      jsonb
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  -- Defesa em profundidade: a função não confia cegamente na entrada do cliente.
+  IF p_cpf !~ '^[0-9]{11}$' THEN
+    RAISE EXCEPTION 'invalid cpf format';
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    count(*)::integer,
+    (array_agg(l.data ORDER BY l.played_at DESC NULLS LAST))[1]
+  FROM leads l
+  WHERE l.event_id = p_event_id AND l.cpf = p_cpf;
+END;
+$$;
+
+-- Contrato de rede mínimo: anon só pode EXECUTAR a função (nunca ler a tabela inteira).
+REVOKE ALL ON FUNCTION public.check_cpf_participation(text, text) FROM PUBLIC;
+GRANT  EXECUTE ON FUNCTION public.check_cpf_participation(text, text) TO anon;
+```
+
+**Validação (evidência para o PR/QA) — rode após a migração:**
+
+```sql
+-- a) As 3 colunas existem
+SELECT column_name, data_type FROM information_schema.columns
+WHERE table_name = 'leads'
+  AND column_name IN ('cpf', 'cpf_check_skipped', 'max_participations_at_submit');
+
+-- b) Constraint de formato e índice criados
+SELECT conname FROM pg_constraint WHERE conname = 'leads_cpf_format_chk';
+SELECT indexname FROM pg_indexes  WHERE indexname = 'idx_leads_event_cpf';
+
+-- c) RPC responde 0 para um CPF nunca visto (troque pelo event.id do config publicado).
+--    A RPC valida só o FORMATO (11 dígitos) — o dígito verificador é validado no cliente.
+SELECT * FROM check_cpf_participation('evento-demo-2026', '39053344705');
+-- esperado: participation_count = 0, last_lead_data = NULL
+
+-- d) RPC rejeita CPF malformado
+SELECT * FROM check_cpf_participation('evento-demo-2026', '123');
+-- esperado: ERROR: invalid cpf format
+```
+
+> **Nota de segurança (achado pré-existente, HUB-87 §2 / ADR-011):** independentemente desta
+> migração, mantenha o SELECT anônimo em `leads` fechado (HUB-88). Como o CPF passa a viver nesta
+> tabela, um `SELECT *` anônimo aberto exporia identificador único de pessoa física — a RPC acima
+> **não** reabre esse acesso (só devolve contagem + último `data`).
 
 ### Acesso admin aos leads (após o evento)
 
