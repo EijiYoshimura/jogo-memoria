@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { GameConfig } from '../game/types'
 import {
   applyKey,
@@ -15,22 +15,46 @@ import {
   nextVisibleScrollLeft,
   type TextMeasurer,
 } from '../lead-capture/keyboard/caret'
-import { applyPhoneMask } from '../lead-capture/mask/phoneMask'
+import { CPF_MASK, PHONE_MASK, type MaskSpec } from '../lead-capture/mask/maskSpec'
+import { CPF_DIGIT_COUNT, isValidCpf, sanitizeCpf } from '../lead-capture/cpf/cpfValidation'
+import { DEFAULT_MAX_PARTICIPATIONS } from '../lead-capture/cpf/constants'
 import {
   CaretOverlay,
   CONTENT_LEFT_OFFSET_PX,
   INPUT_PADDING_LEFT_PX,
 } from './CaretOverlay'
 import { TermsModal } from './TermsModal'
+import { CpfLimitModal } from './CpfLimitModal'
+import { useCpfGate } from './hooks/useCpfGate'
+
+/** Metadados de CPF entregues ao `onSubmit` (persistência é da HUB-92). */
+export interface CpfMeta {
+  /** CPF sanitizado (11 dígitos). */
+  cpf: string
+  /** `true` quando a checagem online não pôde ser concluída (fallback offline). */
+  cpfCheckSkipped: boolean
+}
 
 interface LeadFormProps {
   config: GameConfig
-  onSubmit: (formData: Record<string, string>) => void
+  onSubmit: (formData: Record<string, string>, cpfMeta: CpfMeta) => void
   /**
    * Medidor de largura de texto (injetável). Default: canvas na fonte do input.
    * Os testes injetam um medidor determinístico (jsdom não implementa measureText).
    */
   measureText?: TextMeasurer
+}
+
+/** Campo fixo e embutido do formulário (não vem de `config.leadForm.fields`). */
+interface FormField {
+  id: string
+  label: string
+  type: 'text' | 'email' | 'tel'
+  required: boolean
+  mask?: string
+  keyboardLayout?: string
+  /** Máscara resolvida (CPF ou telefone). Ausente ⇒ campo sem máscara. */
+  maskSpec?: MaskSpec
 }
 
 const DEFAULT_ACCENT_COLOR = '#FCFC30'
@@ -42,16 +66,49 @@ const CONSENT_REQUIRED_MESSAGE = 'É necessário aceitar os termos para particip
 // Campo que recebe auto-shift (1ª letra maiúscula) ao ser ativado vazio (decisão PO 1).
 const AUTO_SHIFT_FIELD_ID = 'name'
 
+// CPF é o primeiro campo, fixo (HUB-87 §4). Nunca entra no payload genérico do submit.
+const CPF_FIELD_ID = 'cpf'
+const CPF_LABEL = 'CPF'
+const CPF_INVALID_MESSAGE = 'CPF inválido. Confira os números digitados.'
+const CPF_CHECKING_ANNOUNCEMENT = 'Verificando CPF'
+const CPF_FOUND_ANNOUNCEMENT = 'CPF localizado, dados preenchidos automaticamente'
+const AUTOFILL_BADGE_TEXT = 'Preenchido automaticamente'
+
 /** Esmaece um accent em hex 6 dígitos (40% alpha) para o estado desabilitado do botão. */
 function dimmedAccent(hex: string): string {
   return /^#[0-9a-fA-F]{6}$/.test(hex) ? `${hex}66` : hex
 }
 
 export function LeadForm({ config, onSubmit, measureText }: LeadFormProps) {
+  // CPF fixo à frente dos campos genéricos; telefone mascarado herda a máscara de telefone.
+  const allFields = useMemo<FormField[]>(() => {
+    const genericFields: FormField[] = config.leadForm.fields.map((f) => ({
+      ...f,
+      maskSpec: f.mask && f.type === 'tel' ? PHONE_MASK : undefined,
+    }))
+    return [
+      {
+        id: CPF_FIELD_ID,
+        label: CPF_LABEL,
+        type: 'tel',
+        required: true,
+        keyboardLayout: 'numeric',
+        maskSpec: CPF_MASK,
+      },
+      ...genericFields,
+    ]
+  }, [config.leadForm.fields])
+
+  const genericFieldIds = useMemo(
+    () => config.leadForm.fields.map((f) => f.id),
+    [config.leadForm.fields]
+  )
+
   const [values, setValues] = useState<Record<string, string>>(() =>
-    Object.fromEntries(config.leadForm.fields.map((f) => [f.id, '']))
+    Object.fromEntries(allFields.map((f) => [f.id, '']))
   )
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [cpfError, setCpfError] = useState('')
   const [accepted, setAccepted] = useState(false)
   const [consentError, setConsentError] = useState('')
   const [showTerms, setShowTerms] = useState(false)
@@ -59,6 +116,33 @@ export function LeadForm({ config, onSubmit, measureText }: LeadFormProps) {
   const vkEnabled = config.leadForm.virtualKeyboard?.enabled ?? false
   const accent = config.event.accentColor ?? DEFAULT_ACCENT_COLOR
   const { activeFieldId, isShifted, setActiveField, setShift } = useVirtualKeyboard(vkEnabled)
+
+  // Espelho dos valores atuais para o gate ler no momento da resolução assíncrona
+  // (evita sobrescrever campos digitados durante a consulta — decisão de design #8).
+  const valuesRef = useRef(values)
+  valuesRef.current = values
+
+  const maxParticipations = config.leadForm.maxParticipations ?? DEFAULT_MAX_PARTICIPATIONS
+  const readValues = useCallback(() => valuesRef.current, [])
+  const applyAutofill = useCallback((fill: Record<string, string>) => {
+    setValues((prev) => ({ ...prev, ...fill }))
+  }, [])
+  const clearValues = useCallback((ids: string[]) => {
+    setValues((prev) => {
+      const next = { ...prev }
+      for (const id of ids) next[id] = ''
+      return next
+    })
+  }, [])
+
+  const cpfGate = useCpfGate({
+    eventId: config.event.id,
+    maxParticipations,
+    fieldIds: genericFieldIds,
+    readValues,
+    applyAutofill,
+    clearValues,
+  })
 
   // Caret customizado (HUB-78): sob VK os inputs são `readOnly` (suprime o teclado
   // nativo do Android), então o caret nativo some. Todo o estado de caret vive aqui em
@@ -81,7 +165,7 @@ export function LeadForm({ config, onSubmit, measureText }: LeadFormProps) {
     return clampCaretIndex(caretPos[fieldId] ?? value.length, value.length)
   }
 
-  const activeField = config.leadForm.fields.find((f) => f.id === activeFieldId) ?? null
+  const activeField = allFields.find((f) => f.id === activeFieldId) ?? null
   const activeLayout = useMemo(
     () => (activeField ? resolveLayout(activeField) : null),
     [activeField]
@@ -99,11 +183,22 @@ export function LeadForm({ config, onSubmit, measureText }: LeadFormProps) {
     }
   }
 
-  function handleChange(fieldId: string, fieldType: string, hasMask: boolean, raw: string) {
-    const value = hasMask && fieldType === 'tel' ? applyPhoneMask(raw) : raw
-    setValues((prev) => ({ ...prev, [fieldId]: value }))
-    if (errors[fieldId]) {
-      setErrors((prev) => ({ ...prev, [fieldId]: '' }))
+  function handleChange(field: FormField, raw: string) {
+    const value = field.maskSpec ? field.maskSpec.format(raw) : raw
+    setValues((prev) => ({ ...prev, [field.id]: value }))
+    if (errors[field.id]) {
+      setErrors((prev) => ({ ...prev, [field.id]: '' }))
+    }
+    if (field.id === CPF_FIELD_ID) {
+      const digits = sanitizeCpf(value)
+      // Erro de dígito verificador só quando os 11 dígitos estão completos (decisão #1).
+      setCpfError(
+        digits.length === CPF_DIGIT_COUNT && !isValidCpf(digits) ? CPF_INVALID_MESSAGE : ''
+      )
+      cpfGate.handleCpfChange(digits)
+    } else if (cpfGate.autofilledFieldIds.has(field.id)) {
+      // Primeiro toque manual num campo autopreenchido remove o selo só dele (decisão #4).
+      cpfGate.clearAutofillFlag(field.id)
     }
   }
 
@@ -117,7 +212,8 @@ export function LeadForm({ config, onSubmit, measureText }: LeadFormProps) {
       key,
       isShifted,
       fieldType: activeField.type,
-      hasMask: !!activeField.mask,
+      hasMask: !!activeField.maskSpec,
+      mask: activeField.maskSpec,
       caretStart,
       caretEnd: caretStart,
     })
@@ -125,7 +221,7 @@ export function LeadForm({ config, onSubmit, measureText }: LeadFormProps) {
     setCaretPos((prev) => ({ ...prev, [activeField.id]: nextCaret }))
     refocusActive.current = true
     if ((key.action ?? 'char') !== 'shift') {
-      handleChange(activeField.id, activeField.type, !!activeField.mask, nextRaw)
+      handleChange(activeField, nextRaw)
     }
   }
 
@@ -191,6 +287,14 @@ export function LeadForm({ config, onSubmit, measureText }: LeadFormProps) {
     }
   }, [showTerms, setActiveField, setShift])
 
+  // O modal de bloqueio cobre a tela e captura o foco — dispensa o teclado virtual.
+  useEffect(() => {
+    if (cpfGate.state === 'blocked') {
+      setActiveField(null)
+      setShift(false)
+    }
+  }, [cpfGate.state, setActiveField, setShift])
+
   function validate(): boolean {
     const newErrors: Record<string, string> = {}
     for (const field of config.leadForm.fields) {
@@ -202,7 +306,17 @@ export function LeadForm({ config, onSubmit, measureText }: LeadFormProps) {
       }
     }
     setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+
+    const cpfDigits = sanitizeCpf(values[CPF_FIELD_ID] ?? '')
+    const cpfMessage =
+      cpfDigits.length === 0
+        ? `${CPF_LABEL} é obrigatório`
+        : !isValidCpf(cpfDigits)
+          ? CPF_INVALID_MESSAGE
+          : ''
+    setCpfError(cpfMessage)
+
+    return Object.keys(newErrors).length === 0 && cpfMessage === ''
   }
 
   function handleAcceptedChange(next: boolean) {
@@ -212,13 +326,45 @@ export function LeadForm({ config, onSubmit, measureText }: LeadFormProps) {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    // Gating em dupla camada e independente: validação de campos E consentimento.
+    // Gating em tripla camada e independente: campos, consentimento e resolução do CPF.
     const fieldsOk = validate()
     const consentOk = accepted
+    const cpfResolved = cpfGate.canSubmit
     if (!consentOk) setConsentError(CONSENT_REQUIRED_MESSAGE)
-    if (!fieldsOk || !consentOk) return
-    onSubmit(values)
+    if (!fieldsOk || !consentOk || !cpfResolved) return
+    // CPF nunca entra no payload genérico — vai separado em cpfMeta (coluna dedicada, §8).
+    const formData: Record<string, string> = {}
+    for (const field of config.leadForm.fields) {
+      formData[field.id] = values[field.id] ?? ''
+    }
+    onSubmit(formData, {
+      cpf: sanitizeCpf(values[CPF_FIELD_ID] ?? ''),
+      cpfCheckSkipped: cpfGate.cpfCheckSkipped,
+    })
   }
+
+  // Reset no lugar (Design §6): limpa CPF, demais campos, selos e consentimento sem
+  // sair da tela `lead-form` — pronto para o próximo participante.
+  function resetForm() {
+    setValues(Object.fromEntries(allFields.map((f) => [f.id, ''])))
+    setErrors({})
+    setCpfError('')
+    setAccepted(false)
+    setConsentError('')
+    setCaretPos({})
+    setCaretScrollLeft(0)
+    setActiveField(null)
+    setShift(false)
+    cpfGate.reset()
+  }
+
+  const submitEnabled = accepted && cpfGate.canSubmit
+  const cpfStatusAnnouncement =
+    cpfGate.state === 'checking'
+      ? CPF_CHECKING_ANNOUNCEMENT
+      : cpfGate.state === 'autofilled'
+        ? CPF_FOUND_ANNOUNCEMENT
+        : ''
 
   return (
     <div
@@ -245,9 +391,16 @@ export function LeadForm({ config, onSubmit, measureText }: LeadFormProps) {
             className="flex flex-col gap-6 w-full"
             autoComplete="off"
           >
-            {config.leadForm.fields.map((field) => {
-              const hasError = !!errors[field.id]
+            <span role="status" aria-live="polite" className="sr-only">
+              {cpfStatusAnnouncement}
+            </span>
+            {allFields.map((field) => {
+              const isCpf = field.id === CPF_FIELD_ID
+              const fieldError = isCpf ? cpfError : errors[field.id]
+              const hasError = !!fieldError
               const isActive = vkEnabled && activeFieldId === field.id
+              const isAutofilled = cpfGate.autofilledFieldIds.has(field.id)
+              const isChecking = isCpf && cpfGate.state === 'checking'
               const borderColor = hasError
                 ? ERROR_BORDER_COLOR
                 : isActive
@@ -257,16 +410,35 @@ export function LeadForm({ config, onSubmit, measureText }: LeadFormProps) {
                 ? hasError
                   ? ERROR_RING_SHADOW
                   : ACTIVE_RING_SHADOW
-                : undefined
+                : isAutofilled
+                  ? `inset 6px 0 0 0 ${accent}`
+                  : undefined
+              const describedBy =
+                [
+                  hasError ? `${field.id}-error` : null,
+                  isAutofilled ? `${field.id}-autofill` : null,
+                ]
+                  .filter(Boolean)
+                  .join(' ') || undefined
               return (
                 <div key={field.id} className="flex flex-col gap-2">
-                  <label
-                    htmlFor={field.id}
-                    className="font-bb-titulos italic font-bold uppercase text-white text-2xl"
-                  >
-                    {field.label}
-                    {field.required && <span className="text-[#FFC7C7] ml-1">*</span>}
-                  </label>
+                  <div className="flex items-start justify-between gap-2">
+                    <label
+                      htmlFor={field.id}
+                      className="font-bb-titulos italic font-bold uppercase text-white text-2xl"
+                    >
+                      {field.label}
+                      {field.required && <span className="text-[#FFC7C7] ml-1">*</span>}
+                    </label>
+                    {isAutofilled && (
+                      <span
+                        id={`${field.id}-autofill`}
+                        className="shrink-0 self-center font-bb-textos normal-case not-italic text-white/70 text-xs"
+                      >
+                        {AUTOFILL_BADGE_TEXT}
+                      </span>
+                    )}
+                  </div>
                   <div className="relative">
                     <input
                       id={field.id}
@@ -275,12 +447,10 @@ export function LeadForm({ config, onSubmit, measureText }: LeadFormProps) {
                       }}
                       type={field.type}
                       value={values[field.id] ?? ''}
-                      onChange={(e) =>
-                        handleChange(field.id, field.type, !!field.mask, e.target.value)
-                      }
+                      onChange={(e) => handleChange(field, e.target.value)}
                       autoComplete="off"
                       aria-invalid={hasError || undefined}
-                      aria-describedby={hasError ? `${field.id}-error` : undefined}
+                      aria-describedby={describedBy}
                       inputMode={
                         vkEnabled ? undefined : field.type === 'tel' ? 'numeric' : undefined
                       }
@@ -304,6 +474,13 @@ export function LeadForm({ config, onSubmit, measureText }: LeadFormProps) {
                         boxShadow,
                       }}
                     />
+                    {isChecking && (
+                      <span
+                        data-testid="cpf-spinner"
+                        aria-hidden
+                        className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 animate-spin rounded-full border-2 border-[#0333BD] border-t-transparent"
+                      />
+                    )}
                     {isActive && (
                       <CaretOverlay
                         value={values[field.id] ?? ''}
@@ -318,7 +495,7 @@ export function LeadForm({ config, onSubmit, measureText }: LeadFormProps) {
                       id={`${field.id}-error`}
                       className="text-[#FFC7C7] font-bb-textos text-base"
                     >
-                      {errors[field.id]}
+                      {fieldError}
                     </span>
                   )}
                 </div>
@@ -373,10 +550,10 @@ export function LeadForm({ config, onSubmit, measureText }: LeadFormProps) {
             </div>
             <button
               type="submit"
-              disabled={!accepted}
-              aria-disabled={!accepted}
+              disabled={!submitEnabled}
+              aria-disabled={!submitEnabled}
               className="mt-8 mx-auto w-[38%] rounded-full border-4 border-white text-[#0333BD] font-bb-titulos font-extrabold uppercase text-xl min-h-[56px] px-6 transition-opacity active:opacity-80 disabled:cursor-not-allowed disabled:text-[#0333BD]/50"
-              style={{ backgroundColor: accepted ? accent : dimmedAccent(accent) }}
+              style={{ backgroundColor: submitEnabled ? accent : dimmedAccent(accent) }}
             >
               ENVIAR
             </button>
@@ -394,6 +571,7 @@ export function LeadForm({ config, onSubmit, measureText }: LeadFormProps) {
         </div>
       )}
       {showTerms && <TermsModal config={config} onClose={() => setShowTerms(false)} />}
+      {cpfGate.state === 'blocked' && <CpfLimitModal accent={accent} onReset={resetForm} />}
     </div>
   )
 }

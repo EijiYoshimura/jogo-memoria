@@ -1,7 +1,17 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react'
 import { LeadForm } from '../LeadForm'
+import { checkCpfParticipation, type CpfLookupResult } from '../lib/cpfLookup'
 import type { GameConfig } from '../../game/types'
+
+// A consulta online do gate de CPF (HUB-91) fica atrás deste módulo — mockado para não
+// tocar Supabase e permitir controlar o resultado por teste. Default: CPF novo.
+vi.mock('../lib/cpfLookup', () => ({ checkCpfParticipation: vi.fn() }))
+const mockLookup = vi.mocked(checkCpfParticipation)
+beforeEach(() => {
+  mockLookup.mockReset()
+  mockLookup.mockResolvedValue({ status: 'not-found' })
+})
 
 function makeConfig(virtualKeyboardEnabled?: boolean): GameConfig {
   return {
@@ -33,6 +43,17 @@ const vkey = (name: string) =>
   within(screen.getByRole('group', { name: 'Teclado virtual' })).getByRole('button', { name })
 const consentCheckbox = () => screen.getByRole('checkbox')
 const acceptConsent = () => fireEvent.click(consentCheckbox())
+
+// CPFs válidos/ inválidos usados nos testes do gate (HUB-91).
+const VALID_CPF = '111.444.777-35'
+const VALID_CPF_DIGITS = '11144477735'
+const INVALID_CPF = '111.444.777-34'
+
+/** Preenche o CPF (1º campo) e aguarda o gate resolver (spinner some). */
+async function fillCpf(cpf: string = VALID_CPF) {
+  fireEvent.change(input('cpf'), { target: { value: cpf } })
+  await waitFor(() => expect(screen.queryByTestId('cpf-spinner')).toBeNull())
+}
 
 describe('LeadForm — modo LIGADO (virtualKeyboard.enabled: true)', () => {
   it('sob VK os inputs são readOnly (suprime teclado nativo Android), sem inputMode (HUB-78)', () => {
@@ -220,9 +241,10 @@ describe('LeadForm — edição com caret (HUB-69)', () => {
     expect(input('name').style.borderColor).toBe('rgb(252, 252, 48)')
   })
 
-  it('campo ativo com erro mantém a borda vermelha (prioridade do estado de erro)', () => {
+  it('campo ativo com erro mantém a borda vermelha (prioridade do estado de erro)', async () => {
     render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
     acceptConsent()
+    await fillCpf() // CPF resolvido habilita o ENVIAR (gate de submit)
     fireEvent.click(input('name')) // ativo, mas vazio e obrigatório
     fireEvent.click(screen.getByRole('button', { name: 'ENVIAR' }))
     expect(input('name').style.borderColor).toBe('rgb(239, 68, 68)')
@@ -306,10 +328,11 @@ describe('LeadForm — modo DESLIGADO (default)', () => {
 })
 
 describe('LeadForm — validação e submit (comum aos dois modos — Cenários 10 e 11)', () => {
-  it('bloqueia submit com obrigatório vazio e exibe mensagem (consentimento marcado)', () => {
+  it('bloqueia submit com obrigatório vazio e exibe mensagem (consentimento marcado)', async () => {
     const onSubmit = vi.fn()
     render(<LeadForm config={makeConfig(undefined)} onSubmit={onSubmit} />)
-    acceptConsent() // habilita o ENVIAR; isola a validação de campos
+    acceptConsent() // habilita o consentimento
+    await fillCpf() // e resolve o CPF; isola a validação dos demais campos
     fireEvent.click(screen.getByRole('button', { name: 'ENVIAR' }))
     expect(onSubmit).not.toHaveBeenCalled()
     expect(screen.getByText('Nome completo é obrigatório')).toBeDefined()
@@ -329,22 +352,27 @@ describe('LeadForm — validação e submit (comum aos dois modos — Cenários 
     expect(screen.getByText('E-mail inválido')).toBeDefined()
   })
 
-  it('submete quando tudo é válido e consentimento marcado (Cenário 8)', () => {
+  it('submete quando tudo é válido e consentimento marcado (Cenário 8)', async () => {
     const onSubmit = vi.fn()
     render(<LeadForm config={makeConfig(undefined)} onSubmit={onSubmit} />)
     fireEvent.change(input('name'), { target: { value: 'Maria' } })
     fireEvent.change(input('email'), { target: { value: 'maria@exemplo.com' } })
     acceptConsent()
+    await fillCpf()
     fireEvent.click(screen.getByRole('button', { name: 'ENVIAR' }))
     expect(onSubmit).toHaveBeenCalledTimes(1)
+    // CPF vai em cpfMeta (2º argumento), nunca no payload genérico.
     expect(onSubmit).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'Maria', email: 'maria@exemplo.com' })
+      expect.objectContaining({ name: 'Maria', email: 'maria@exemplo.com' }),
+      { cpf: VALID_CPF_DIGITS, cpfCheckSkipped: false }
     )
+    expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('cpf')
   })
 
-  it('no modo ligado, submit inválido exibe erro, fecha o teclado e ele reabre ao tocar o campo (Cenário 11 / HUB-86 CA7)', () => {
+  it('no modo ligado, submit inválido exibe erro, fecha o teclado e ele reabre ao tocar o campo (Cenário 11 / HUB-86 CA7)', async () => {
     render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
     acceptConsent()
+    await fillCpf() // habilita o ENVIAR; o erro exercitado é o do campo name vazio
     fireEvent.click(input('name'))
     expect(screen.getByRole('group', { name: 'Teclado virtual' })).toBeDefined()
     fireEvent.click(screen.getByRole('button', { name: 'ENVIAR' }))
@@ -387,9 +415,10 @@ describe('LeadForm — layout BB Seguros (HUB-65)', () => {
     expect(el.style.borderColor).toBe('rgb(252, 252, 48)')
   })
 
-  it('botão ENVIAR pill amarelo com texto azul e fonte BB (Cenário 6, habilitado)', () => {
+  it('botão ENVIAR pill amarelo com texto azul e fonte BB (Cenário 6, habilitado)', async () => {
     render(<LeadForm config={makeConfig(undefined)} onSubmit={vi.fn()} />)
-    acceptConsent() // habilitado → fundo accent cheio
+    acceptConsent()
+    await fillCpf() // consentimento + CPF resolvido → fundo accent cheio
     const btn = screen.getByRole('button', { name: 'ENVIAR' })
     expect(btn.className).toContain('rounded-full')
     expect(btn.className).toContain('font-bb-titulos')
@@ -421,11 +450,14 @@ describe('LeadForm — consentimento LGPD (HUB-67)', () => {
     expect(consentCheckbox()).toHaveProperty('checked', false)
   })
 
-  it('ENVIAR inicia desabilitado e habilita ao marcar o aceite (Cenário 6)', () => {
+  it('ENVIAR inicia desabilitado e habilita com aceite + CPF resolvido (Cenário 6 / HUB-91)', async () => {
     render(<LeadForm config={makeConfig(undefined)} onSubmit={vi.fn()} />)
     const btn = screen.getByRole('button', { name: 'ENVIAR' }) as HTMLButtonElement
     expect(btn.disabled).toBe(true)
     acceptConsent()
+    // Consentimento sozinho não basta: o CPF ainda não resolveu (gate de submit).
+    expect(btn.disabled).toBe(true)
+    await fillCpf()
     expect(btn.disabled).toBe(false)
   })
 
@@ -572,12 +604,13 @@ describe('LeadForm — dispensar teclado ao tocar fora (HUB-86)', () => {
     expect(keyboard()).toBeNull()
   })
 
-  it('CA7 — tocar em ENVIAR (form válido) dispara o submit e fecha o teclado (toque único)', () => {
+  it('CA7 — tocar em ENVIAR (form válido) dispara o submit e fecha o teclado (toque único)', async () => {
     const onSubmit = vi.fn()
     render(<LeadForm config={makeConfig(true)} onSubmit={onSubmit} />)
     fireEvent.change(input('name'), { target: { value: 'Maria' } })
     fireEvent.change(input('email'), { target: { value: 'maria@exemplo.com' } })
     acceptConsent()
+    await fillCpf()
     fireEvent.click(input('name')) // abre o teclado
     expect(keyboard()).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'ENVIAR' }))
@@ -591,5 +624,171 @@ describe('LeadForm — dispensar teclado ao tocar fora (HUB-86)', () => {
     fireEvent.click(logo())
     fireEvent.click(input('name'))
     expect(keyboard()).toBeNull()
+  })
+})
+
+describe('LeadForm — gate de CPF (HUB-91)', () => {
+  const FOUND_DATA = {
+    name: 'Maria da Silva',
+    email: 'maria@email.com',
+    phone: '(61) 99999-9999',
+  }
+  const cpfConfig = (maxParticipations?: number): GameConfig => {
+    const cfg = makeConfig(undefined)
+    if (maxParticipations !== undefined) cfg.leadForm.maxParticipations = maxParticipations
+    return cfg
+  }
+  const badges = () => screen.queryAllByText('Preenchido automaticamente')
+
+  it('CPF é o primeiro campo do formulário, antes de nome/e-mail/telefone', () => {
+    render(<LeadForm config={cpfConfig()} onSubmit={vi.fn()} />)
+    const fieldInputs = Array.from(document.querySelectorAll('input')).filter(
+      (el) => el.type !== 'checkbox'
+    )
+    expect(fieldInputs[0].id).toBe('cpf')
+    expect(fieldInputs.map((el) => el.id)).toEqual(['cpf', 'name', 'email', 'phone'])
+  })
+
+  it('CPF inválido (dígito verificador) mostra erro específico e NÃO consulta (Cenário 1)', () => {
+    render(<LeadForm config={cpfConfig()} onSubmit={vi.fn()} />)
+    fireEvent.change(input('cpf'), { target: { value: INVALID_CPF } })
+    expect(screen.getByText('CPF inválido. Confira os números digitados.')).toBeDefined()
+    expect(mockLookup).not.toHaveBeenCalled()
+  })
+
+  it('não valida nem consulta enquanto o CPF está incompleto (decisão de design #1)', () => {
+    render(<LeadForm config={cpfConfig()} onSubmit={vi.fn()} />)
+    fireEvent.change(input('cpf'), { target: { value: '111.444' } })
+    expect(screen.queryByText('CPF inválido. Confira os números digitados.')).toBeNull()
+    expect(mockLookup).not.toHaveBeenCalled()
+  })
+
+  it('completar 11 dígitos válidos dispara a consulta automática com os dígitos sanitizados', async () => {
+    render(<LeadForm config={cpfConfig()} onSubmit={vi.fn()} />)
+    await fillCpf()
+    expect(mockLookup).toHaveBeenCalledWith('e', VALID_CPF_DIGITS)
+  })
+
+  it('CPF aplica a máscara 000.000.000-00 pelo teclado numérico e dispara a consulta (VK ligado)', async () => {
+    render(<LeadForm config={makeConfig(true)} onSubmit={vi.fn()} />)
+    fireEvent.click(input('cpf')) // teclado numérico (dialpad)
+    for (const d of VALID_CPF_DIGITS.split('')) fireEvent.click(vkey(d))
+    expect(input('cpf').value).toBe(VALID_CPF)
+    await waitFor(() => expect(mockLookup).toHaveBeenCalledWith('e', VALID_CPF_DIGITS))
+  })
+
+  it('mostra o spinner e bloqueia o ENVIAR enquanto a consulta está em curso (checking)', async () => {
+    let resolveLookup!: (r: CpfLookupResult) => void
+    mockLookup.mockReturnValue(new Promise<CpfLookupResult>((res) => (resolveLookup = res)))
+    render(<LeadForm config={cpfConfig()} onSubmit={vi.fn()} />)
+    fireEvent.change(input('name'), { target: { value: 'Maria' } })
+    fireEvent.change(input('email'), { target: { value: 'maria@exemplo.com' } })
+    acceptConsent()
+    fireEvent.change(input('cpf'), { target: { value: VALID_CPF } })
+    // Em checking: spinner visível e ENVIAR ainda bloqueado mesmo com consentimento + campos.
+    expect(screen.getByTestId('cpf-spinner')).toBeDefined()
+    expect((screen.getByRole('button', { name: 'ENVIAR' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByRole('status').textContent).toBe('Verificando CPF')
+    await act(async () => resolveLookup({ status: 'not-found' }))
+    expect(screen.queryByTestId('cpf-spinner')).toBeNull()
+    expect((screen.getByRole('button', { name: 'ENVIAR' }) as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('CPF novo (sem match) libera o formulário sem autopreencher (Cenário 2)', async () => {
+    render(<LeadForm config={cpfConfig()} onSubmit={vi.fn()} />)
+    await fillCpf()
+    expect(badges().length).toBe(0)
+    expect(input('name').value).toBe('')
+    acceptConsent()
+    expect((screen.getByRole('button', { name: 'ENVIAR' }) as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('CPF cadastrado abaixo do limite autopreenche os demais campos com selo (Cenário 3)', async () => {
+    mockLookup.mockResolvedValue({ status: 'found', participationCount: 1, lastLeadData: FOUND_DATA })
+    render(<LeadForm config={cpfConfig(2)} onSubmit={vi.fn()} />)
+    await fillCpf()
+    expect(input('name').value).toBe('Maria da Silva')
+    expect(input('email').value).toBe('maria@email.com')
+    expect(input('phone').value).toBe('(61) 99999-9999')
+    expect(badges().length).toBe(3)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByRole('status').textContent).toBe(
+      'CPF localizado, dados preenchidos automaticamente'
+    )
+  })
+
+  it('editar um campo autopreenchido remove o selo só dele (decisão de design #4)', async () => {
+    mockLookup.mockResolvedValue({ status: 'found', participationCount: 1, lastLeadData: FOUND_DATA })
+    render(<LeadForm config={cpfConfig(2)} onSubmit={vi.fn()} />)
+    await fillCpf()
+    expect(badges().length).toBe(3)
+    fireEvent.change(input('name'), { target: { value: 'Maria da Silva Souza' } })
+    expect(badges().length).toBe(2)
+  })
+
+  it('autofill NÃO sobrescreve campo já digitado durante a consulta (decisão de design #8)', async () => {
+    let resolveLookup!: (r: CpfLookupResult) => void
+    mockLookup.mockReturnValue(new Promise<CpfLookupResult>((res) => (resolveLookup = res)))
+    render(<LeadForm config={cpfConfig(2)} onSubmit={vi.fn()} />)
+    fireEvent.change(input('cpf'), { target: { value: VALID_CPF } })
+    // Operador digita o nome ENQUANTO a consulta corre.
+    fireEvent.change(input('name'), { target: { value: 'João Digitado' } })
+    await act(async () =>
+      resolveLookup({ status: 'found', participationCount: 1, lastLeadData: FOUND_DATA })
+    )
+    // Nome digitado é preservado; e-mail/telefone (vazios) são autopreenchidos.
+    expect(input('name').value).toBe('João Digitado')
+    expect(input('email').value).toBe('maria@email.com')
+    expect(badges().length).toBe(2)
+  })
+
+  it('editar o CPF após autopreenchimento limpa os campos e os selos (decisão de design #5)', async () => {
+    mockLookup.mockResolvedValue({ status: 'found', participationCount: 1, lastLeadData: FOUND_DATA })
+    render(<LeadForm config={cpfConfig(2)} onSubmit={vi.fn()} />)
+    await fillCpf()
+    expect(input('name').value).toBe('Maria da Silva')
+    // Editar o CPF (aqui para um valor incompleto) invalida o autopreenchimento anterior
+    // e só dispara nova consulta quando os 11 dígitos válidos forem completados de novo.
+    fireEvent.change(input('cpf'), { target: { value: '111.444' } })
+    await waitFor(() => expect(input('name').value).toBe(''))
+    expect(input('email').value).toBe('')
+    expect(badges().length).toBe(0)
+  })
+
+  it('limite atingido abre o modal de bloqueio e "Próximo participante" reseta o form (Cenário 4)', async () => {
+    mockLookup.mockResolvedValue({ status: 'found', participationCount: 1, lastLeadData: FOUND_DATA })
+    render(<LeadForm config={cpfConfig(1)} onSubmit={vi.fn()} />)
+    fireEvent.change(input('cpf'), { target: { value: VALID_CPF } })
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeDefined())
+    expect(screen.getByText('Você já participou!')).toBeDefined()
+    fireEvent.click(screen.getByRole('button', { name: /Próximo participante/i }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(input('cpf').value).toBe('')
+    expect(input('name').value).toBe('')
+  })
+
+  it('limite 0 (ilimitado) nunca bloqueia, mesmo com muitas participações (Cenário 5)', async () => {
+    mockLookup.mockResolvedValue({ status: 'found', participationCount: 5, lastLeadData: FOUND_DATA })
+    render(<LeadForm config={cpfConfig(0)} onSubmit={vi.fn()} />)
+    await fillCpf()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(input('name').value).toBe('Maria da Silva')
+  })
+
+  it('fallback offline trata como novo, libera e marca cpfCheckSkipped no submit (Cenário 6)', async () => {
+    const onSubmit = vi.fn()
+    mockLookup.mockResolvedValue({ status: 'offline-fallback', reason: 'timeout' })
+    render(<LeadForm config={cpfConfig()} onSubmit={onSubmit} />)
+    fireEvent.change(input('name'), { target: { value: 'Maria' } })
+    fireEvent.change(input('email'), { target: { value: 'maria@exemplo.com' } })
+    acceptConsent()
+    await fillCpf()
+    // Indistinguível de CPF novo: sem erro, sem modal.
+    expect(screen.queryByRole('dialog')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'ENVIAR' }))
+    expect(onSubmit).toHaveBeenCalledWith(expect.any(Object), {
+      cpf: VALID_CPF_DIGITS,
+      cpfCheckSkipped: true,
+    })
   })
 })

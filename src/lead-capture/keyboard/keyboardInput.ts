@@ -4,22 +4,23 @@
 // (o consumidor reaplica a própria máscara/validação).
 
 import type { KeyboardKey } from './keyboardLayouts'
-import {
-  applyPhoneMask,
-  maskedToRawIndex,
-  rawToMaskedIndex,
-  MAX_PHONE_DIGITS,
-} from '../mask/phoneMask'
+import { maskedToRawIndex, rawToMaskedIndex } from '../mask/phoneMask'
+import { PHONE_MASK, type MaskSpec } from '../mask/maskSpec'
 
 export interface ApplyKeyInput {
-  /** Valor atual do campo (já mascarado, no caso de tel). */
+  /** Valor atual do campo (já mascarado, no caso de campo com máscara). */
   currentValue: string
   key: KeyboardKey
   isShifted: boolean
   /** 'text' | 'email' | 'tel' | ... */
   fieldType: string
-  /** Se o campo possui máscara (ex.: tel). */
+  /** Se o campo possui máscara (ex.: tel, cpf). */
   hasMask: boolean
+  /**
+   * Especificação da máscara a aplicar (formatador + limite de dígitos). Quando
+   * ausente, campos `tel` mascarados caem na máscara de telefone (retrocompat HUB-57).
+   */
+  mask?: MaskSpec
   /** Posição do caret no `currentValue`. Default = fim (retrocompat HUB-57). */
   caretStart?: number
   /** Fim da seleção; se `start !== end` (range), trata-se como `caretStart` (decisão PO 2). */
@@ -46,8 +47,19 @@ function onlyDigits(value: string): string {
   return value.replace(/\D/g, '')
 }
 
-/** Insere dígito(s) na posição do caret sobre os dígitos crus do tel e reaplica a máscara. */
-function applyTelChar(input: ApplyKeyInput): ApplyKeyResult {
+/**
+ * Resolve a máscara efetiva do campo: prioriza a spec explícita; na ausência, campos
+ * `tel` mascarados caem na máscara de telefone (retrocompat com chamadas anteriores a
+ * HUB-91, que não passavam `mask`). Sem máscara aplicável, retorna `null`.
+ */
+function resolveMaskSpec(input: ApplyKeyInput): MaskSpec | null {
+  if (input.mask) return input.mask
+  if (input.hasMask && input.fieldType === 'tel') return PHONE_MASK
+  return null
+}
+
+/** Insere dígito(s) na posição do caret sobre os dígitos crus e reaplica a máscara. */
+function applyMaskedChar(input: ApplyKeyInput, mask: MaskSpec): ApplyKeyResult {
   const { currentValue, key } = input
   const caret = resolveCaret(input)
   const rawDigits = onlyDigits(currentValue)
@@ -58,15 +70,15 @@ function applyTelChar(input: ApplyKeyInput): ApplyKeyResult {
     rawDigits.slice(0, rawCaret) +
     insertedDigits +
     rawDigits.slice(rawCaret)
-  ).slice(0, MAX_PHONE_DIGITS)
+  ).slice(0, mask.maxDigits)
   const newRawCaret = Math.min(rawCaret + insertedDigits.length, newDigits.length)
-  const newMasked = applyPhoneMask(newDigits)
+  const newMasked = mask.format(newDigits)
   // Single-shot: inserir caractere consome o shift (nextShift: false).
   return { nextRaw: newDigits, nextShift: false, nextCaret: rawToMaskedIndex(newMasked, newRawCaret) }
 }
 
-/** Remove o dígito cru à esquerda do caret no tel; no-op se não houver dígito à esquerda. */
-function applyTelBackspace(input: ApplyKeyInput): ApplyKeyResult {
+/** Remove o dígito cru à esquerda do caret; no-op se não houver dígito à esquerda. */
+function applyMaskedBackspace(input: ApplyKeyInput, mask: MaskSpec): ApplyKeyResult {
   const { currentValue, isShifted } = input
   const caret = resolveCaret(input)
   const rawDigits = onlyDigits(currentValue)
@@ -75,7 +87,7 @@ function applyTelBackspace(input: ApplyKeyInput): ApplyKeyResult {
     return { nextRaw: rawDigits, nextShift: isShifted, nextCaret: 0 }
   }
   const newDigits = rawDigits.slice(0, rawCaret - 1) + rawDigits.slice(rawCaret)
-  const newMasked = applyPhoneMask(newDigits)
+  const newMasked = mask.format(newDigits)
   return {
     nextRaw: newDigits,
     nextShift: isShifted,
@@ -84,8 +96,9 @@ function applyTelBackspace(input: ApplyKeyInput): ApplyKeyResult {
 }
 
 function applyChar(input: ApplyKeyInput): ApplyKeyResult {
-  const { currentValue, key, isShifted, fieldType, hasMask } = input
-  if (hasMask && fieldType === 'tel') return applyTelChar(input)
+  const { currentValue, key, isShifted } = input
+  const mask = resolveMaskSpec(input)
+  if (mask) return applyMaskedChar(input, mask)
 
   const raw = key.value ?? ''
   const inserted = isShifted && raw.length === 1 ? raw.toUpperCase() : raw
@@ -113,8 +126,9 @@ function applyChar(input: ApplyKeyInput): ApplyKeyResult {
 }
 
 function applyBackspace(input: ApplyKeyInput): ApplyKeyResult {
-  const { currentValue, fieldType, hasMask, isShifted } = input
-  if (hasMask && fieldType === 'tel') return applyTelBackspace(input)
+  const { currentValue, isShifted } = input
+  const mask = resolveMaskSpec(input)
+  if (mask) return applyMaskedBackspace(input, mask)
 
   const caret = resolveCaret(input)
   if (caret === 0) {
