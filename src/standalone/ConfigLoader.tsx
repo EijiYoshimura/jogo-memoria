@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { GameConfig } from '../game/types'
+import { DEFAULT_MAX_PARTICIPATIONS } from '../lead-capture/cpf/constants'
 
 interface ConfigContextValue {
   config: GameConfig
@@ -34,11 +35,40 @@ function isValidConfig(c: unknown): c is GameConfig {
   const leadForm = cfg['leadForm'] as Record<string, unknown> | undefined
   if (!leadForm || !Array.isArray(leadForm['fields'])) return false
 
+  // Limite de participações por CPF (HUB-87, antifraude): opcional e retrocompatível.
+  // Quando presente, precisa ser inteiro >= 0 (0 = ilimitado). Falha alto se malformado,
+  // no mesmo padrão do offlineExportPin — erro visível, sem default silencioso para valor
+  // inválido. Ausência ⇒ default aplicado em withConfigDefaults, após a validação.
+  const maxParticipations = leadForm['maxParticipations']
+  if (
+    maxParticipations !== undefined &&
+    (typeof maxParticipations !== 'number' ||
+      !Number.isInteger(maxParticipations) ||
+      maxParticipations < 0)
+  ) {
+    return false
+  }
+
   // Gate offline-only (HUB-88): PIN de baixo valor para o export local do
   // IndexedDB. NÃO é o segredo do Admin online — este vive no servidor (RPC).
   if (typeof cfg['offlineExportPin'] !== 'string' || !/^\d{4,6}$/.test(cfg['offlineExportPin'] as string)) return false
 
   return true
+}
+
+/**
+ * Aplica defaults retrocompatíveis ao config já validado. Hoje só o
+ * `leadForm.maxParticipations` (HUB-87): ausente ⇒ `DEFAULT_MAX_PARTICIPATIONS`.
+ * Mantém o config imutável (retorna cópia rasa das partes alteradas).
+ */
+function withConfigDefaults(config: GameConfig): GameConfig {
+  return {
+    ...config,
+    leadForm: {
+      ...config.leadForm,
+      maxParticipations: config.leadForm.maxParticipations ?? DEFAULT_MAX_PARTICIPATIONS,
+    },
+  }
 }
 
 interface ConfigProviderProps {
@@ -58,7 +88,7 @@ export function ConfigProvider({ children }: ConfigProviderProps) {
         if (!isValidConfig(data)) {
           throw new Error('config.json mal formado ou incompleto')
         }
-        setState({ status: 'ready', config: data })
+        setState({ status: 'ready', config: withConfigDefaults(data) })
       })
       .catch((err: unknown) => {
         const message = err instanceof Error ? err.message : 'Erro desconhecido'
