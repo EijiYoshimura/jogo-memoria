@@ -44,6 +44,7 @@ O Linear é a ferramenta de gestão de board da equipe. O MCP oficial do Linear 
 3. O status das Issues deve ser atualizado em tempo real: `Backlog → Todo → In Progress → In Review → Done`
 4. O Orchestrator é responsável por criar e atualizar Issues via MCP do Linear
 5. PRs devem referenciar o ID da Issue (`LIN-123`)
+6. **Uma sprint = um cycle do Linear (1:1).** O nome e os limites da sprint são os do cycle. Se um mesmo cycle receber mais de um incremento com cerimônias próprias, os arquivos de Review/Retro/audit são **datados** (`review-YYYY-MM-DD.md`, `retrospective-YYYY-MM-DD.md`) para conviver sem sobrescrever o encerramento anterior (achado A3-02: ambiguidade de "em que sprint estamos").
 
 ---
 
@@ -163,16 +164,27 @@ Comandos que o sandbox classifica como *"evaluates arguments as shell code"* dis
 | `source .venv/bin/activate` / `. .venv/bin/activate` | Chame o binário do venv direto: `.venv/bin/python`, `.venv/bin/pytest`, `.venv/bin/alembic`, `.venv/bin/pip` |
 | `export VAR=valor` (comando isolado) | Prefixe a variável **inline** na mesma linha: `VAR=valor comando` |
 | `eval "..."` | Evite por completo |
+| `cd <dir> && <cmd>` | Opere o diretório direto: `git -C <dir> …`, `npm --prefix <dir> …`, `pytest <dir>` ou binário por caminho absoluto — **nunca** `cd &&` |
 
 **Regras invioláveis de execução:**
 1. **Nunca** ative virtualenv via `source`/`.` — invoque os executáveis em `.venv/bin/` diretamente.
 2. **Nunca** use `export` como comando isolado — passe variáveis inline: `DATABASE_URL="..." .venv/bin/alembic upgrade head`.
 3. Prefira comandos **simples e diretos**; evite encadeamentos longos com `&&` que misturem ativação + export + execução.
 4. Se um comando exigir aprovação, **reformule** para o padrão sandbox-friendly antes de reexecutar — nunca reenvie o mesmo comando esperando aprovação.
+5. **Nunca** use `cd <dir> && …` — opere o diretório com `git -C`, `npm --prefix` ou caminho absoluto. Trocar de diretório com `&&` foi o padrão de violação mais frequente da sprint (achado da auditoria 2026-07-03: 52% dos comandos), com risco latente de aprovação manual.
+6. **Agrupe tool calls independentes na mesma leva** — vários `Read` juntos, `lint` + `type-check` + testes em paralelo. Chamadas sequenciais desnecessárias pagam o custo de geração do modelo a cada turno (achado de eficiência da auditoria).
 
 > Esta regra vale para **todos os agentes** que executam shell (dev-back, dev-front, qa, tech-lead, process-auditor). O Orchestrator inclui esse lembrete nas instruções de cada agente que disparar.
 
 **DoD de issues de backend:** inclui o item **"nenhum comando exigiu aprovação manual de sandbox"** — se algum exigiu, a issue não está pronta até o fluxo ser reformulado para o padrão sandbox-friendly (achado AUD-01 da auditoria).
+
+### Orçamento de contexto e recorte de spec (obrigatório — achado da auditoria)
+
+Contexto inflado é a causa dominante de lentidão dos agentes (tempo gerando ≈ 8,6× o tempo executando ferramentas; o prefill cresce de forma não-linear: ~6s até 100k tokens → ~122s a 175k). Ao disparar sub-agentes, o Orchestrator:
+
+1. **Injeta o recorte do spec no briefing — nunca manda "ler o doc inteiro".** Em issues **≥ 5 pts** é proibido delegar a leitura da spec completa: o Orchestrator extrai as seções/critérios relevantes e passa o contrato pronto. Medição: HUB-91 leu specs inteiros → 302k de contexto; HUB-92/HUB-94 com recorte → 145k/53k, com prefill ~10× menor.
+2. **Orçamento de ~120k tokens por sub-agente.** Para tarefas longas, mantém o escopo enxuto e, ao se aproximar de ~120k, faz handoff (resumo de estado → novo sub-agente) em vez de deixar inflar. Não interrompe agente que já está produzindo perto do fim.
+3. **Fatia issues grandes** antes de criar o worktree quando o escopo for amplo.
 
 ---
 
@@ -190,7 +202,7 @@ Comandos que o sandbox classifica como *"evaluates arguments as shell code"* dis
 | Backlog Grooming | PO + PM + Tech Lead | Meio do ciclo | `/docs/ceremonies/sprint-{n}/grooming.md` |
 
 **Regras obrigatórias:**
-- **A primeira atividade de cada dia é sempre o Daily Standup.** O Orchestrator o conduz e salva o arquivo antes de qualquer outra tarefa ser iniciada ou retomada.
+- **A primeira atividade de cada dia é sempre o Daily Standup.** O Orchestrator o conduz e salva o arquivo antes de qualquer outra tarefa ser iniciada ou retomada. **Concretamente: o daily é aberto/gerado ANTES de disparar o 1º sub-agente do dia** — nunca depois (achado A3-04: o daily de 02/07 foi escrito às 22:53, após o ciclo inteiro do HUB-88).
 - **Ao final de cada sprint, Sprint Review e Retrospectiva são obrigatórias e ocorrem nessa ordem**, sem exceção. A sprint só é encerrada após ambas concluídas e documentadas.
 - Toda cerimônia deve gerar um arquivo Markdown salvo no repositório imediatamente após sua execução. Nenhuma cerimônia é considerada concluída sem o arquivo correspondente commitado.
 
@@ -291,7 +303,7 @@ Os templates de cada arquivo de cerimônia **não ficam aqui** — vivem no comm
 4. Os arquivos devem ser salvos no repositório; o Orchestrator faz o commit ao final da cerimônia/dia
 5. Nenhuma cerimônia é considerada **Done** sem seu arquivo correspondente gerado e salvo
 6. O relatório diário consolida: evolução do board no Linear, decisões tomadas e impedimentos
-7. O PO/PM Sync ocorre **no mínimo 2x por semana** — PO apresenta o status das entregas, PM valida o alinhamento com os objetivos de negócio e OKRs. O arquivo de registro é gerado ao final de cada sync.
+7. O PO/PM Sync ocorre **no mínimo 2x por semana** — PO apresenta o status das entregas, PM valida o alinhamento com os objetivos de negócio e OKRs. O arquivo de registro é gerado ao final de cada sync. Os **2 dias fixos** são definidos no Sprint Planning; no **encerramento da sprint é gate** verificar que houve ≥ 2 syncs/semana (achado recorrente A-01/A3-01: o sync sumiu em duas sprints seguidas, atrasando decisões de LGPD como a HUB-95).
 8. **Trilha de aprovação rastreável (AUD-04):** o Orchestrator registra a aprovação de cada gate como comentário na Issue do Linear (ou no PR), em formato estruturado — `Tech Lead: APROVADO — <resumo>`, `QA: APROVADO contra critérios`, `PO: APROVADO` (ou `N/A — issue técnica`). Sem trilha registrada, não há merge. Isso torna auditável quem aprovou o quê e a taxa de reprovação.
 
 ---
@@ -358,6 +370,7 @@ Estas regras **nunca podem ser quebradas**, independentemente de prazo, pressão
 7. **Zero erros silenciosos** — erros não tratados explicitamente devem estourar (propagar) para que falhas sejam visíveis e rastreáveis; capturar um erro sem tratá-lo adequadamente é proibido
 8. **Sem tratamentos de erro genéricos** — blocos `catch` vazios, `catch (e) {}`, logs sem re-throw, e handlers que engolam qualquer exceção são vetados; cada ponto de tratamento deve ser específico ao erro esperado e tomar uma ação concreta (recuperar, transformar ou re-lançar)
 9. **Zero erros de qualidade ao concluir — gate é bloqueante** — nenhuma task é dada como concluída, nenhum PR é aprovado e nenhum merge é feito com erro de **lint**, **type-check** (mypy/tsc) ou **teste** falhando. Erros **nunca** são mascarados, suprimidos com `# type: ignore`/`eslint-disable`/`noqa` sem justificativa explícita, nem empurrados para o backlog como forma de "passar". Se qualquer um dos três checks falha, a task **não está pronta** — ponto. Erros pré-existentes herdados de outra issue são reportados ao Tech Lead e viram issue de correção imediata, não desculpa para mergear com o gate vermelho.
+10. **Nenhum arquivo-fonte binário ou com bytes de controle entra num PR** — se um arquivo de código aparece como binário no `git diff`/`numstat` (`- -`) ou contém bytes de controle crus (ex.: NUL `\x00`), o diff fica ilegível e a lógica escapa do code review. Use sempre escapes (`\0`) em vez de bytes crus. O Tech Lead bloqueia e o Orchestrator não mergeia (achado A3-03: `reconciliation.ts` passou binário pelo review do Tech Lead e só o QA pegou).
 
 ---
 
