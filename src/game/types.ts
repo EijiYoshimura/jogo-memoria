@@ -49,6 +49,12 @@ export interface GameConfig {
       /** Override de layout do teclado virtual por campo; ausência cai no `type`. */
       keyboardLayout?: string
     }>
+    /**
+     * Limite de participações por CPF nesta ativação (HUB-87, antifraude). Opcional e
+     * retrocompatível. Ausente ⇒ default 1 (uma participação por CPF). `0` ⇒ ilimitado
+     * (nunca bloqueia). Inteiro ≥ 0.
+     */
+    maxParticipations?: number
   }
   /**
    * PIN de gate do export local offline (HUB-88). Gate **apenas de UI**, de
