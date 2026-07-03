@@ -4,7 +4,7 @@ Registro dos worktrees git ativos por agente (modelo de isolamento — ver `CLAU
 
 | Agente | Issue | Branch | Worktree | Status | Criado em |
 |--------|-------|--------|----------|--------|-----------|
-| `dev-front` | HUB-91 | `dev-front/HUB-91-leadform-cpf-gate` | `.worktrees/dev-front/HUB-91-leadform-cpf-gate/` | In Progress | 2026-07-02 |
+| _(nenhum worktree ativo)_ | | | | | |
 
 ## Histórico
 
@@ -14,3 +14,4 @@ Registro dos worktrees git ativos por agente (modelo de isolamento — ver `CLAU
 | `dev-back` | HUB-89 | `dev-back/HUB-89-migracao-cpf-rpc` | 2026-07-02 | PR #34 mergeado (`91c6616`), Onda 1 HUB-87. SQL aplicado em produção. |
 | `dev-front` | HUB-90 | `dev-front/HUB-90-cpf-validacao-lib` | 2026-07-02 | PR #35 mergeado (`0afa619`), Onda 1 HUB-87. 100% de cobertura. |
 | `dev-front` | HUB-93 | `dev-front/HUB-93-config-maxparticipations` | 2026-07-02 | PR #36 mergeado (`a6f4e29`), Onda 1 HUB-87. PO APROVADO (texto LGPD). |
+| `dev-front` | HUB-91 | `dev-front/HUB-91-leadform-cpf-gate` | 2026-07-03 | PR #37 mergeado, Onda 2 HUB-87. CPF gate + modal + `useModalA11y`. Gate verde (374 testes), Tech Lead/QA/PO APROVADO. |
