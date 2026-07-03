@@ -17,6 +17,7 @@ Este guia descreve como configurar e operar o Jogo da Memória em um evento, do 
 9. [Durante o evento](#durante-o-evento)
 10. [Painel administrativo](#painel-administrativo)
 11. [Exportando leads](#exportando-leads)
+    - [LGPD — o arquivo de leads exportado](#lgpd--o-arquivo-de-leads-exportado)
 12. [Pós-evento — conferência de dados](#pós-evento--conferência-de-dados)
 
 ---
@@ -306,6 +307,34 @@ Colunas geradas dinamicamente com base nos campos do `leadForm.fields`, seguidas
 - `synced_from` — `online` ou `offline-sync`
 
 **Dica:** exporte os leads ao final de cada dia para ter backup local.
+
+### LGPD — o arquivo de leads exportado
+
+O CSV exportado contém **dado pessoal**, incluindo o **CPF completo** (11 dígitos) de cada participante,
+além de nome, e-mail e demais campos do formulário. O CPF sai completo de propósito: o arquivo é a
+ferramenta com que você **deduplica e apura o sorteio**, e uma máscara inviabilizaria essa apuração (ver
+`docs/adr/ADR-013-cpf-completo-csv-export.md`). Como contrapartida, o arquivo exige cuidado de LGPD depois
+do download:
+
+- **É um arquivo de dados pessoais sujeito à LGPD** — trate-o como confidencial, não como um relatório
+  comum. Dentro do totem/painel o dado é protegido por senha e pelos controles do servidor; **no arquivo
+  baixado, essa proteção técnica deixa de existir**.
+- **Controle de acesso:** apenas quem tem a senha do Admin online (ou o `offlineExportPin`, no modo offline)
+  consegue gerar o CSV. Depois de baixado, restrinja o acesso às pessoas responsáveis pela apuração do
+  sorteio. **Não** deixe o arquivo em pasta compartilhada aberta, e-mail sem proteção ou no próprio
+  dispositivo do totem.
+- **Responsabilidade após o download:** quem baixa o arquivo passa a ser responsável por sua guarda. A
+  partir daí o dado depende de **controle organizacional** (seu processo), não mais do sistema.
+- **Retenção e descarte:** guarde o arquivo **apenas pelo tempo necessário à apuração do sorteio** e
+  **descarte com segurança** (exclusão definitiva de todas as cópias) assim que a apuração terminar. A
+  finalidade informada ao participante é o controle de participações e a elegibilidade ao sorteio — não há
+  base para retenção indefinida.
+- **Não redistribua:** não encaminhe nem copie o arquivo além do estritamente necessário para apurar o
+  sorteio.
+
+> **Pendência de compliance (HUB-95):** a identidade do **controlador de dados** ainda está em verificação
+> jurídica. Quando confirmada, esta orientação e o ADR-013 serão revisados para nomear o controlador
+> responsável final pelo arquivo. Até lá, siga o controle de acesso, retenção e descarte acima.
 
 ### Reconciliação de participações
 
