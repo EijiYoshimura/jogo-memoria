@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { applyKey } from '../keyboardInput'
 import { applyPhoneMask } from '../../mask/phoneMask'
+import { CPF_MASK } from '../../mask/maskSpec'
 import type { KeyboardKey } from '../keyboardLayouts'
 
 const char = (value: string): KeyboardKey => ({ label: value, value })
@@ -222,5 +223,49 @@ describe('applyKey — tel com caret no meio (Cenários 8 e 9)', () => {
   it('inserir no fim do tel sem caret usa o fim (retrocompat)', () => {
     const r = call('(11) 9', char('8'), { fieldType: 'tel', hasMask: true })
     expect(r.nextRaw).toBe('1198')
+  })
+})
+
+describe('applyKey — máscara de CPF (HUB-91, mask explícita)', () => {
+  const cpfChar = (value: string, digit: string, caretStart?: number) =>
+    applyKey({
+      currentValue: value,
+      key: char(digit),
+      isShifted: false,
+      fieldType: 'tel',
+      hasMask: true,
+      mask: CPF_MASK,
+      caretStart,
+    })
+  const cpfBackspace = (value: string, caretStart?: number) =>
+    applyKey({
+      currentValue: value,
+      key: BACKSPACE,
+      isShifted: false,
+      fieldType: 'tel',
+      hasMask: true,
+      mask: CPF_MASK,
+      caretStart,
+    })
+
+  it('insere dígito no fim e a máscara reformata para 000.000.000-00', () => {
+    const r = cpfChar('111.444.777-3', '5')
+    expect(r.nextRaw).toBe('11144477735')
+    expect(CPF_MASK.format(r.nextRaw)).toBe('111.444.777-35')
+  })
+
+  it('ignora o 12º dígito (limite de 11 do CPF)', () => {
+    const r = cpfChar('111.444.777-35', '9')
+    expect(r.nextRaw).toBe('11144477735')
+  })
+
+  it('backspace no fim remove o último dígito, não o separador', () => {
+    const r = cpfBackspace('111.444.777-35')
+    expect(r.nextRaw).toBe('1114447773')
+  })
+
+  it('insere no meio sobre os dígitos crus (caret em coords mascaradas)', () => {
+    const r = cpfChar('111.4', '9', 5)
+    expect(r.nextRaw).toBe('11149')
   })
 })
