@@ -7,7 +7,7 @@ vi.mock('../lib/supabaseClient', () => ({ supabase: {} }))
 vi.mock('../hooks/useLeadPersistence', () => ({
   useLeadPersistence: () => ({ saveLead: vi.fn() }),
 }))
-vi.mock('../ConfigLoader', () => ({
+vi.mock('../hooks/useConfig', () => ({
   useConfig: () => ({
     event: {
       id: 'e',
