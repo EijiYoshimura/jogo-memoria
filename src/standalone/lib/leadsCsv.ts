@@ -2,8 +2,12 @@ import type { GameConfig } from '../../game/types'
 import type { LocalLead } from './leadsDb'
 import type { RemoteLead } from './adminLeads'
 
-/** Colunas fixas anexadas após os campos dinâmicos do `leadForm`. */
-const FIXED_HEADERS = ['played_at', 'score', 'time_taken', 'synced_from'] as const
+/**
+ * Colunas fixas anexadas após os campos dinâmicos do `leadForm`. `cpf` vem da coluna
+ * dedicada (nunca do `data`), sem mascaramento no CSV — decisão de mascarar o export
+ * é futura (HUB-87, fora de escopo do HUB-92).
+ */
+const FIXED_HEADERS = ['cpf', 'played_at', 'score', 'time_taken', 'synced_from'] as const
 
 /** Rótulo de origem dos leads lidos do IndexedDB local. */
 const LOCAL_SYNCED_FROM = 'offline-sync'
@@ -40,6 +44,7 @@ export function buildLeadsCsv(
   for (const lead of remoteLeads) {
     rows.push([
       ...fieldIds.map((id) => lead.data[id] ?? ''),
+      lead.cpf ?? '',
       lead.played_at ?? '',
       numberToCell(lead.score),
       numberToCell(lead.time_taken),
@@ -50,6 +55,7 @@ export function buildLeadsCsv(
   for (const lead of localLeads) {
     rows.push([
       ...fieldIds.map((id) => lead.data[id] ?? ''),
+      lead.cpf ?? '',
       lead.playedAt,
       String(lead.score),
       String(lead.timeTaken),

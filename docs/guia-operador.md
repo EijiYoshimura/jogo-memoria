@@ -299,12 +299,24 @@ O botão **Exportar CSV** no painel admin gera um arquivo com:
 O arquivo é nomeado: `leads-{event.id}-{YYYY-MM-DD}.csv`
 
 Colunas geradas dinamicamente com base nos campos do `leadForm.fields`, seguidas de:
+- `cpf` — CPF do participante (11 dígitos, coluna dedicada; vazio para leads antigos sem CPF)
 - `played_at` — data/hora da jogada (ISO 8601)
 - `score` — pontuação (número de pares encontrados)
 - `time_taken` — tempo em segundos
 - `synced_from` — `online` ou `offline-sync`
 
 **Dica:** exporte os leads ao final de cada dia para ter backup local.
+
+### Reconciliação de participações
+
+No painel **online**, abaixo dos totais, a seção **"Reconciliação de participações"**
+lista os CPFs que ultrapassaram o limite configurado (`leadForm.maxParticipations`),
+incluindo jogadas que foram registradas offline (quando a checagem online não pôde ser
+concluída a tempo). O CPF é exibido parcialmente mascarado (ex.: `123.***.**9-00`).
+
+É um relatório **estritamente informativo** para apoiar a apuração do sorteio: o sistema
+**não** reverte nem invalida nenhuma participação automaticamente. A decisão sobre um CPF
+excedente é sempre humana.
 
 ---
 

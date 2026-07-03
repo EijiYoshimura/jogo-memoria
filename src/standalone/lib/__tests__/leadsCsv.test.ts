@@ -32,6 +32,9 @@ const remote: RemoteLead = {
   time_taken: 42,
   played_at: '2026-07-02T12:00:00Z',
   synced_from: 'online',
+  cpf: '11122233344',
+  cpf_check_skipped: false,
+  max_participations_at_submit: 1,
 }
 
 const local: LocalLead = {
@@ -43,27 +46,30 @@ const local: LocalLead = {
   synced: false,
   consentedAt: '2026-07-02T13:00:00Z',
   consentVersion: '1.0',
+  cpf: '55566677788',
+  cpfCheckSkipped: false,
+  maxParticipationsAtSubmit: 1,
 }
 
 describe('buildLeadsCsv', () => {
-  it('gera cabeçalho com labels dos campos + colunas fixas', () => {
+  it('gera cabeçalho com labels dos campos + colunas fixas (cpf incluída)', () => {
     const csv = buildLeadsCsv(makeConfig(), [], [])
-    expect(csv).toBe('Nome,E-mail,played_at,score,time_taken,synced_from')
+    expect(csv).toBe('Nome,E-mail,cpf,played_at,score,time_taken,synced_from')
   })
 
-  it('inclui linhas remotas e locais na ordem remoto → local', () => {
+  it('inclui linhas remotas e locais na ordem remoto → local com a coluna CPF', () => {
     const csv = buildLeadsCsv(makeConfig(), [remote], [local])
     const lines = csv.split('\n')
     expect(lines).toHaveLength(3)
     expect(lines[1]).toBe(
-      '"Ana","ana@example.com","2026-07-02T12:00:00Z","6","42","online"'
+      '"Ana","ana@example.com","11122233344","2026-07-02T12:00:00Z","6","42","online"'
     )
     expect(lines[2]).toBe(
-      '"Bruno","bruno@example.com","2026-07-02T13:00:00Z","4","55","offline-sync"'
+      '"Bruno","bruno@example.com","55566677788","2026-07-02T13:00:00Z","4","55","offline-sync"'
     )
   })
 
-  it('trata score/time_taken nulos e campo ausente como célula vazia', () => {
+  it('trata cpf/score/time_taken nulos e campo ausente como célula vazia', () => {
     const partial: RemoteLead = {
       event_id: 'evento-demo-2026',
       data: { name: 'Sem Email' },
@@ -71,11 +77,14 @@ describe('buildLeadsCsv', () => {
       time_taken: null,
       played_at: null,
       synced_from: null,
+      cpf: null,
+      cpf_check_skipped: null,
+      max_participations_at_submit: null,
     }
     const csv = buildLeadsCsv(makeConfig(), [partial], [])
     const lines = csv.split('\n')
-    // synced_from nulo cai no fallback "online"
-    expect(lines[1]).toBe('"Sem Email","","","","","online"')
+    // cpf nulo → célula vazia; synced_from nulo cai no fallback "online"
+    expect(lines[1]).toBe('"Sem Email","","","","","","online"')
   })
 
   it('escapa aspas duplicando-as (proteção de CSV)', () => {
