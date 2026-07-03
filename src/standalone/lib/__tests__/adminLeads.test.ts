@@ -16,6 +16,9 @@ const SAMPLE_ROW: RemoteLead = {
   time_taken: 42,
   played_at: '2026-07-02T12:00:00Z',
   synced_from: 'online',
+  cpf: '12345678900',
+  cpf_check_skipped: false,
+  max_participations_at_submit: 1,
 }
 
 describe('listAdminLeads', () => {

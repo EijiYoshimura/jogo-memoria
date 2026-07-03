@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import type { GameConfig } from '../game/types'
 import { getAllLeads, getPendingLeads } from './lib/leadsDb'
 import { syncPendingLeads } from './lib/leadsSync'
 import { listAdminLeads, type RemoteLead } from './lib/adminLeads'
 import { buildLeadsCsv } from './lib/leadsCsv'
+import { findParticipationOverages } from './lib/reconciliation'
 
 interface AdminPanelProps {
   config: GameConfig
@@ -15,6 +16,25 @@ type DashboardMode = 'online' | 'offline'
 
 const MAX_ATTEMPTS = 3
 const LOCKOUT_SECONDS = 60
+
+/** Total de dígitos de um CPF. */
+const CPF_DIGITS = 11
+/** Dígitos preservados no início e no fim da máscara; o miolo é ocultado. */
+const CPF_VISIBLE_EDGE = 3
+
+/**
+ * Máscara parcial do CPF para exibição ao operador — ex.: `123.***.**9-00` (HUB-87 §7).
+ * Mantém apenas os 3 primeiros e os 3 últimos dígitos; a seção é informativa e não
+ * precisa expor o CPF completo em tela.
+ */
+function maskCpfForDisplay(cpf: string): string {
+  const digits = cpf.padStart(CPF_DIGITS, '0').slice(0, CPF_DIGITS)
+  const hidden = '*'.repeat(CPF_DIGITS - CPF_VISIBLE_EDGE * 2)
+  const partial =
+    digits.slice(0, CPF_VISIBLE_EDGE) + hidden + digits.slice(CPF_DIGITS - CPF_VISIBLE_EDGE)
+  // Agrupamento canônico do CPF (3-3-3-2), mesmo padrão de `applyCpfMask`.
+  return `${partial.slice(0, 3)}.${partial.slice(3, 6)}.${partial.slice(6, 9)}-${partial.slice(9)}`
+}
 
 export function AdminPanel({ config, onClose }: AdminPanelProps) {
   const [view, setView] = useState<PanelView>('secret')
@@ -33,6 +53,21 @@ export function AdminPanel({ config, onClose }: AdminPanelProps) {
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncMessage, setSyncMessage] = useState('')
   const [statsError, setStatsError] = useState<string | null>(null)
+
+  // Reconciliação: deriva os CPFs excedentes das linhas já autorizadas pela RPC —
+  // sem nova chamada de rede. Informativo apenas; nenhuma escrita (Critério 7).
+  const overages = useMemo(
+    () =>
+      findParticipationOverages(
+        remoteLeads.map((lead) => ({
+          cpf: lead.cpf,
+          eventId: lead.event_id,
+          cpfCheckSkipped: lead.cpf_check_skipped ?? false,
+          maxParticipationsAtSubmit: lead.max_participations_at_submit,
+        }))
+      ),
+    [remoteLeads]
+  )
 
   useEffect(() => {
     if (!lockedUntil) return
@@ -270,6 +305,44 @@ export function AdminPanel({ config, onClose }: AdminPanelProps) {
       </div>
 
       {syncMessage && <p className="text-green-400 mb-4">{syncMessage}</p>}
+
+      {mode === 'online' && (
+        <section
+          className="bg-gray-800 rounded-xl p-4 mb-8"
+          aria-labelledby="reconciliation-heading"
+        >
+          <h3 id="reconciliation-heading" className="text-white text-xl font-bold mb-1">
+            Reconciliação de participações
+          </h3>
+          <p className="text-gray-400 text-sm mb-4">
+            CPFs que excederam o limite configurado, incluindo jogadas registradas offline.
+            Relatório informativo — nenhuma participação é revertida automaticamente.
+          </p>
+          {overages.length === 0 ? (
+            <p className="text-gray-400 text-sm">
+              Nenhum CPF excedeu o limite configurado.
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {overages.map((overage) => (
+                <li
+                  key={overage.cpf}
+                  className="flex justify-between items-center bg-gray-900 rounded-lg px-4 py-3 text-sm"
+                >
+                  <span className="text-white font-mono">
+                    {maskCpfForDisplay(overage.cpf)}
+                  </span>
+                  <span className="text-gray-300">
+                    {overage.totalParticipations} de {overage.limit} permitidas
+                    {overage.offlineParticipations > 0 &&
+                      ` · ${overage.offlineParticipations} offline`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
 
       <div className="flex flex-col gap-4">
         <button

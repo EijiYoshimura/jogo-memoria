@@ -49,6 +49,9 @@ const remoteRow = (name: string): RemoteLead => ({
   time_taken: 30,
   played_at: '2026-07-02T12:00:00Z',
   synced_from: 'online',
+  cpf: '12345678900',
+  cpf_check_skipped: false,
+  max_participations_at_submit: 1,
 })
 
 const localRow = (name: string, synced: boolean): LocalLead => ({
@@ -60,6 +63,9 @@ const localRow = (name: string, synced: boolean): LocalLead => ({
   synced,
   consentedAt: '2026-07-02T13:00:00Z',
   consentVersion: '1.0',
+  cpf: '55566677788',
+  cpfCheckSkipped: false,
+  maxParticipationsAtSubmit: 1,
 })
 
 function typeSecret(label: string, value: string) {
@@ -141,6 +147,54 @@ describe('AdminPanel — autorização online via RPC (HUB-88)', () => {
     const text = await blob.text()
     expect(text).toContain('Ana') // lead remoto autorizado
     expect(text).toContain('Carla') // pendente local
+  })
+})
+
+describe('AdminPanel — reconciliação de participações (HUB-92)', () => {
+  beforeEach(() => {
+    listAdminLeads.mockReset()
+    getAllLeads.mockReset().mockResolvedValue([])
+    getPendingLeads.mockReset().mockResolvedValue([])
+    syncPendingLeads.mockReset().mockResolvedValue(undefined)
+    setOnline(true)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  it('lista o CPF excedente com máscara parcial e sem ação de escrita', async () => {
+    // Mesmo CPF (12345678900) jogou 2x com limite 1 → excedente.
+    listAdminLeads.mockResolvedValue({
+      status: 'authorized',
+      leads: [remoteRow('Ana'), remoteRow('Ana')],
+    })
+
+    render(<AdminPanel config={makeConfig()} onClose={vi.fn()} />)
+    typeSecret('Senha do painel admin', 'passphrase')
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+    await screen.findByText('Painel Admin')
+
+    expect(screen.getByText('Reconciliação de participações')).toBeDefined()
+    // 3 primeiros + 3 últimos dígitos visíveis, miolo mascarado.
+    expect(screen.getByText('123.***.**9-00')).toBeDefined()
+    expect(screen.getByText(/2 de 1 permitidas/)).toBeDefined()
+    // Critério 7: seção informativa — nenhum botão de reverter/excluir participação.
+    expect(
+      screen.queryByRole('button', { name: /revert|excluir|remover|invalidar/i })
+    ).toBeNull()
+  })
+
+  it('mostra estado vazio quando nenhum CPF excede o limite', async () => {
+    listAdminLeads.mockResolvedValue({ status: 'authorized', leads: [remoteRow('Ana')] })
+
+    render(<AdminPanel config={makeConfig()} onClose={vi.fn()} />)
+    typeSecret('Senha do painel admin', 'passphrase')
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+    await screen.findByText('Painel Admin')
+
+    expect(screen.getByText('Nenhum CPF excedeu o limite configurado.')).toBeDefined()
   })
 })
 

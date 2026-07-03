@@ -14,6 +14,12 @@ export interface LocalLead {
   synced: boolean
   consentedAt: string
   consentVersion: string
+  // Antifraude por CPF (HUB-87). Campos adicionais — sem bump de DB_VERSION (mesmo
+  // precedente de consentedAt/consentVersion): leads legados no IndexedDB podem não
+  // tê-los, e o consumo trata a ausência (undefined) de forma retrocompatível.
+  cpf: string | null
+  cpfCheckSkipped: boolean
+  maxParticipationsAtSubmit: number | null
 }
 
 async function getDb() {

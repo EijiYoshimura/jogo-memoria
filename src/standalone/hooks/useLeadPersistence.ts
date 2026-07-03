@@ -12,6 +12,12 @@ interface SaveLeadParams {
   timeTaken: number
   consentedAt: string
   consentVersion: string
+  /** CPF sanitizado (11 dígitos) do participante — coluna dedicada, fora do `data` (HUB-87 §1). */
+  cpf: string
+  /** `true` quando a checagem online de dedup não pôde ser concluída (fallback offline). */
+  cpfCheckSkipped: boolean
+  /** Snapshot do limite de participações vigente no submit — insumo da reconciliação. */
+  maxParticipationsAtSubmit: number
 }
 
 export function useLeadPersistence() {
@@ -31,6 +37,9 @@ export function useLeadPersistence() {
     timeTaken,
     consentedAt,
     consentVersion,
+    cpf,
+    cpfCheckSkipped,
+    maxParticipationsAtSubmit,
   }: SaveLeadParams): Promise<void> {
     const playedAt = new Date().toISOString()
 
@@ -43,6 +52,9 @@ export function useLeadPersistence() {
       synced: false,
       consentedAt,
       consentVersion,
+      cpf,
+      cpfCheckSkipped,
+      maxParticipationsAtSubmit,
     })
 
     const success = await syncOnlineLead({
@@ -53,6 +65,9 @@ export function useLeadPersistence() {
       playedAt,
       consentedAt,
       consentVersion,
+      cpf,
+      cpfCheckSkipped,
+      maxParticipationsAtSubmit,
     })
 
     if (success) {

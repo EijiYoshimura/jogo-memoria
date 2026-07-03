@@ -1,13 +1,16 @@
 import { useState, useCallback } from 'react'
 import { useConfig } from './ConfigLoader'
 import { SplashScreen } from './SplashScreen'
-import { LeadForm } from './LeadForm'
+import { LeadForm, type CpfMeta } from './LeadForm'
 import { MemoryGame } from '../game/index'
 import { ResultScreen } from './ResultScreen'
 import { AdminPanel } from './AdminPanel'
 import { useLeadPersistence } from './hooks/useLeadPersistence'
 import { useKioskMode } from './hooks/useKioskMode'
 import { DEFAULT_CONSENT_VERSION } from './lib/lgpd'
+import { DEFAULT_MAX_PARTICIPATIONS } from '../lead-capture/cpf/constants'
+
+const EMPTY_CPF_META: CpfMeta = { cpf: '', cpfCheckSkipped: false }
 
 type AppScreen = 'splash' | 'lead-form' | 'game' | 'result' | 'admin'
 
@@ -26,6 +29,10 @@ export function App() {
   const [gameResult, setGameResult] = useState<GameResult>({ score: 0, timeTaken: 0 })
   const [previousScreen, setPreviousScreen] = useState<AppScreen>('splash')
   const [consentedAt, setConsentedAt] = useState<string>('')
+  const [cpfMeta, setCpfMeta] = useState<CpfMeta>(EMPTY_CPF_META)
+  const [maxParticipationsAtSubmit, setMaxParticipationsAtSubmit] = useState<number>(
+    DEFAULT_MAX_PARTICIPATIONS
+  )
 
   const handleStart = useCallback(() => {
     setScreen('lead-form')
@@ -37,12 +44,20 @@ export function App() {
   }, [screen])
 
   // O gating do LeadForm garante que o submit só ocorre com consentimento;
-  // o instante do submit é o instante do consentimento.
-  const handleLeadSubmit = useCallback((formData: Record<string, string>) => {
-    setLeadData(formData)
-    setConsentedAt(new Date().toISOString())
-    setScreen('game')
-  }, [])
+  // o instante do submit é o instante do consentimento. O `cpfMeta` e o snapshot
+  // do limite vigente são capturados aqui e persistidos no fim do jogo (HUB-87 §8).
+  const handleLeadSubmit = useCallback(
+    (formData: Record<string, string>, meta: CpfMeta) => {
+      setLeadData(formData)
+      setCpfMeta(meta)
+      setMaxParticipationsAtSubmit(
+        config.leadForm.maxParticipations ?? DEFAULT_MAX_PARTICIPATIONS
+      )
+      setConsentedAt(new Date().toISOString())
+      setScreen('game')
+    },
+    [config.leadForm.maxParticipations]
+  )
 
   const handleGameComplete = useCallback(
     async (score: number, timeTaken: number) => {
@@ -56,17 +71,30 @@ export function App() {
         timeTaken,
         consentedAt,
         consentVersion,
+        cpf: cpfMeta.cpf,
+        cpfCheckSkipped: cpfMeta.cpfCheckSkipped,
+        maxParticipationsAtSubmit,
       })
 
       setScreen('result')
     },
-    [config.event.id, config.lgpd?.consentVersion, consentedAt, leadData, saveLead]
+    [
+      config.event.id,
+      config.lgpd?.consentVersion,
+      consentedAt,
+      cpfMeta,
+      leadData,
+      maxParticipationsAtSubmit,
+      saveLead,
+    ]
   )
 
   const handleNext = useCallback(() => {
     setLeadData({})
     setGameResult({ score: 0, timeTaken: 0 })
     setConsentedAt('')
+    setCpfMeta(EMPTY_CPF_META)
+    setMaxParticipationsAtSubmit(DEFAULT_MAX_PARTICIPATIONS)
     setScreen('splash')
   }, [])
 

@@ -12,6 +12,11 @@ export async function syncLead(lead: LocalLead): Promise<boolean> {
     synced_from: 'offline-sync',
     consented_at: lead.consentedAt,
     consent_version: lead.consentVersion,
+    // Retrocompatível: leads bufferados antes do HUB-92 não têm estes campos no
+    // IndexedDB (undefined em runtime) — normalizados para os defaults das colunas.
+    cpf: lead.cpf ?? null,
+    cpf_check_skipped: lead.cpfCheckSkipped ?? false,
+    max_participations_at_submit: lead.maxParticipationsAtSubmit ?? null,
   })
 
   return !error
@@ -27,6 +32,9 @@ export async function syncOnlineLead(lead: Omit<LocalLead, 'localId' | 'synced'>
     synced_from: 'online',
     consented_at: lead.consentedAt,
     consent_version: lead.consentVersion,
+    cpf: lead.cpf,
+    cpf_check_skipped: lead.cpfCheckSkipped,
+    max_participations_at_submit: lead.maxParticipationsAtSubmit,
   })
 
   return !error

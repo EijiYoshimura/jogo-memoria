@@ -12,6 +12,11 @@ export interface RemoteLead {
   time_taken: number | null
   played_at: string | null
   synced_from: string | null
+  // Antifraude por CPF (HUB-87). A RPC retorna `SETOF leads`, então estas colunas já
+  // vêm no mesmo payload — reaproveitadas pela reconciliação sem nova chamada de rede.
+  cpf: string | null
+  cpf_check_skipped: boolean | null
+  max_participations_at_submit: number | null
 }
 
 /**
