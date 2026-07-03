@@ -21,7 +21,7 @@
     "timeLimitSeconds": 60,
     "timerEnabled": false,
     "autoResetSeconds": 30,
-    "showBefore": { "enabled": true, "seconds": 2 }
+    "showBefore": { "enabled": true, "seconds": 3 }
   },
   "leadForm": {
     "title": "Preencha seus dados para jogar!",
@@ -50,7 +50,7 @@
         "keyboardLayout": "numeric"
       }
     ],
-    "maxParticipations": 2
+    "maxParticipations": 5
   },
   "offlineExportPin": "4720",
   "lgpd": {
