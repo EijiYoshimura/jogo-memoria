@@ -3,11 +3,12 @@
 // de buildConsentText e, quando configurado, a Política de Privacidade (HUB-62) numa
 // camada acima (z-[60] > modal z-50 > teclado virtual). Reaproveita PrivacyPolicyScreen.
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import type { GameConfig } from '../game/types'
 import { buildConsentText, getPurposeText } from './lib/lgpd'
 import { sanitizeExternalUrl } from './lib/sanitizeExternalUrl'
 import { PrivacyPolicyScreen } from './PrivacyPolicyScreen'
+import { useModalA11y } from './hooks/useModalA11y'
 
 interface TermsModalProps {
   config: GameConfig
@@ -16,56 +17,14 @@ interface TermsModalProps {
 
 const TITLE_ID = 'terms-modal-title'
 
-function getFocusable(container: HTMLElement): HTMLElement[] {
-  return Array.from(
-    container.querySelectorAll<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-    )
-  ).filter((el) => !el.hasAttribute('disabled'))
-}
-
 export function TermsModal({ config, onClose }: TermsModalProps) {
-  const cardRef = useRef<HTMLDivElement>(null)
   const [showPolicy, setShowPolicy] = useState(false)
+  const { cardRef, onKeyDown } = useModalA11y({ onEscape: onClose })
 
   const consentText = buildConsentText(config)
   const purposeText = getPurposeText(config)
   const privacyPolicyPath = config.lgpd?.privacyPolicyPath
   const privacyPolicyUrl = sanitizeExternalUrl(config.lgpd?.privacyPolicyUrl)
-
-  // Foco inicial no card + trava o scroll do body; restaura no unmount.
-  useEffect(() => {
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    cardRef.current?.focus()
-    return () => {
-      document.body.style.overflow = previousOverflow
-    }
-  }, [])
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation()
-        onClose()
-        return
-      }
-      if (e.key !== 'Tab' || !cardRef.current) return
-      const focusable = getFocusable(cardRef.current)
-      if (focusable.length === 0) return
-      const first = focusable[0]
-      const last = focusable[focusable.length - 1]
-      const active = document.activeElement
-      if (e.shiftKey && active === first) {
-        e.preventDefault()
-        last.focus()
-      } else if (!e.shiftKey && active === last) {
-        e.preventDefault()
-        first.focus()
-      }
-    },
-    [onClose]
-  )
 
   if (showPolicy && privacyPolicyPath) {
     return (
@@ -84,7 +43,7 @@ export function TermsModal({ config, onClose }: TermsModalProps) {
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
       onClick={onClose}
-      onKeyDown={handleKeyDown}
+      onKeyDown={onKeyDown}
     >
       <div
         ref={cardRef}
