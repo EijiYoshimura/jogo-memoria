@@ -1,18 +1,7 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import type { GameConfig } from '../game/types'
 import { DEFAULT_MAX_PARTICIPATIONS } from '../lead-capture/cpf/constants'
-
-interface ConfigContextValue {
-  config: GameConfig
-}
-
-const ConfigContext = createContext<ConfigContextValue | null>(null)
-
-export function useConfig(): GameConfig {
-  const ctx = useContext(ConfigContext)
-  if (!ctx) throw new Error('useConfig must be used inside ConfigProvider')
-  return ctx.config
-}
+import { ConfigContext } from './hooks/useConfig'
 
 type LoadState =
   | { status: 'loading' }

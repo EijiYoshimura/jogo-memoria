@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { useConfig } from './ConfigLoader'
+import { useConfig } from './hooks/useConfig'
 import { SplashScreen } from './SplashScreen'
 import { LeadForm, type CpfMeta } from './LeadForm'
 import { MemoryGame } from '../game/index'

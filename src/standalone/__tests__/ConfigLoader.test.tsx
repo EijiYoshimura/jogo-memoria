@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
-import { ConfigProvider, useConfig } from '../ConfigLoader'
+import { ConfigProvider } from '../ConfigLoader'
+import { useConfig } from '../hooks/useConfig'
 import { DEFAULT_MAX_PARTICIPATIONS } from '../../lead-capture/cpf/constants'
 
 // Config bruto mínimo e válido, sem `maxParticipations`. Cada teste sobrescreve
