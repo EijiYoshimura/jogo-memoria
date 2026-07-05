@@ -5,6 +5,7 @@ import { syncPendingLeads } from './lib/leadsSync'
 import { listAdminLeads, type RemoteLead } from './lib/adminLeads'
 import { buildLeadsCsv } from './lib/leadsCsv'
 import { findParticipationOverages } from './lib/reconciliation'
+import { isForeignCpf } from '../lead-capture/cpf/constants'
 
 interface AdminPanelProps {
   config: GameConfig
@@ -36,6 +37,11 @@ function maskCpfForDisplay(cpf: string): string {
   return `${partial.slice(0, 3)}.${partial.slice(3, 6)}.${partial.slice(6, 9)}-${partial.slice(9)}`
 }
 
+/** Conta participações com o código de participante estrangeiro (HUB-109). */
+function countForeignLeads(leads: ReadonlyArray<{ cpf: string | null }>): number {
+  return leads.filter((lead) => lead.cpf !== null && isForeignCpf(lead.cpf)).length
+}
+
 export function AdminPanel({ config, onClose }: AdminPanelProps) {
   const [view, setView] = useState<PanelView>('secret')
   const [mode, setMode] = useState<DashboardMode>('online')
@@ -50,6 +56,7 @@ export function AdminPanel({ config, onClose }: AdminPanelProps) {
   const [syncedLeads, setSyncedLeads] = useState(0)
   const [pendingLeads, setPendingLeads] = useState(0)
   const [totalLeads, setTotalLeads] = useState(0)
+  const [foreignLeads, setForeignLeads] = useState(0)
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncMessage, setSyncMessage] = useState('')
   const [statsError, setStatsError] = useState<string | null>(null)
@@ -101,6 +108,8 @@ export function AdminPanel({ config, onClose }: AdminPanelProps) {
     setSyncedLeads(remote.length)
     setPendingLeads(pending.length)
     setTotalLeads(remote.length + pending.length)
+    // Remotos (já sincronizados) + apenas pendentes locais (!synced) — sem dupla contagem.
+    setForeignLeads(countForeignLeads(remote) + countForeignLeads(pending))
   }
 
   async function enterOnline(secret: string, leads: RemoteLead[]) {
@@ -116,6 +125,8 @@ export function AdminPanel({ config, onClose }: AdminPanelProps) {
     setRemoteLeads([])
     setPendingLeads(all.filter((lead) => !lead.synced).length)
     setTotalLeads(all.length)
+    // Todos os leads locais do dispositivo — mesma semântica do card "Total local".
+    setForeignLeads(countForeignLeads(all))
     setMode('offline')
     setView('dashboard')
   }
@@ -283,7 +294,7 @@ export function AdminPanel({ config, onClose }: AdminPanelProps) {
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-4 gap-4 mb-8">
         <div className="bg-gray-800 rounded-xl p-4 text-center">
           <p className="text-gray-400 text-sm">
             {mode === 'offline' ? 'Total local' : 'Total de leads'}
@@ -301,6 +312,10 @@ export function AdminPanel({ config, onClose }: AdminPanelProps) {
         <div className="bg-gray-800 rounded-xl p-4 text-center">
           <p className="text-gray-400 text-sm">Pendentes</p>
           <p className="text-yellow-400 text-4xl font-bold">{pendingLeads}</p>
+        </div>
+        <div className="bg-gray-800 rounded-xl p-4 text-center">
+          <p className="text-gray-400 text-sm">Estrangeiros</p>
+          <p className="text-blue-400 text-4xl font-bold">{foreignLeads}</p>
         </div>
       </div>
 

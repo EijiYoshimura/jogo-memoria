@@ -6,6 +6,8 @@
 // ultrapassou o limite configurado, para a apuração humana do sorteio decidir o que
 // fazer. É estritamente informativo: nenhuma participação é revertida (Critério 7).
 
+import { isForeignCpf } from '../../lead-capture/cpf/constants'
+
 /** `maxParticipationsAtSubmit = 0` significa ilimitado — nunca gera excedente (§1). */
 const UNLIMITED = 0
 
@@ -64,6 +66,9 @@ export function findParticipationOverages(
 
   for (const lead of leads) {
     if (lead.cpf === null) continue // linhas sem CPF não entram no relatório (§7)
+    // Exclusão na entrada (defesa em profundidade): o grupo do código estrangeiro
+    // nunca se forma — participação sem limite por design (HUB-109).
+    if (isForeignCpf(lead.cpf)) continue
 
     const key = groupKey(lead.eventId, lead.cpf)
     const group =

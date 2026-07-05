@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import type { GameConfig } from '../../game/types'
 import type { RemoteLead } from '../lib/adminLeads'
 import type { LocalLead } from '../lib/leadsDb'
+import { FOREIGN_CPF } from '../../lead-capture/cpf/constants'
 
 const { listAdminLeads, getAllLeads, getPendingLeads, syncPendingLeads } = vi.hoisted(() => ({
   listAdminLeads: vi.fn(),
@@ -195,6 +196,89 @@ describe('AdminPanel — reconciliação de participações (HUB-92)', () => {
     await screen.findByText('Painel Admin')
 
     expect(screen.getByText('Nenhum CPF excedeu o limite configurado.')).toBeDefined()
+  })
+})
+
+describe('AdminPanel — card Estrangeiros (HUB-109)', () => {
+  const foreignRemote = (name: string): RemoteLead => ({ ...remoteRow(name), cpf: FOREIGN_CPF })
+  const foreignLocal = (name: string, synced: boolean): LocalLead => ({
+    ...localRow(name, synced),
+    cpf: FOREIGN_CPF,
+  })
+  /** Escopo do card pelo rótulo — os demais cards também exibem números. */
+  const foreignCard = () => screen.getByText('Estrangeiros').parentElement as HTMLElement
+
+  beforeEach(() => {
+    listAdminLeads.mockReset()
+    getAllLeads.mockReset().mockResolvedValue([])
+    getPendingLeads.mockReset().mockResolvedValue([])
+    syncPendingLeads.mockReset().mockResolvedValue(undefined)
+    setOnline(true)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  async function openOnlineDashboard() {
+    render(<AdminPanel config={makeConfig()} onClose={vi.fn()} />)
+    typeSecret('Senha do painel admin', 'passphrase')
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+    await screen.findByText('Painel Admin')
+  }
+
+  it('online: conta remotos + apenas pendentes locais, sem dupla contagem (risco R3)', async () => {
+    // 'Ana' está sincronizada: aparece no retorno remoto E no IndexedDB (synced=true).
+    // Se a contagem usasse getAllLeads, ela seria contada duas vezes.
+    listAdminLeads.mockResolvedValue({
+      status: 'authorized',
+      leads: [foreignRemote('Ana'), foreignRemote('Bia'), remoteRow('Caio')],
+    })
+    getAllLeads.mockResolvedValue([foreignLocal('Ana', true), foreignLocal('Dana', false)])
+    getPendingLeads.mockResolvedValue([foreignLocal('Dana', false), localRow('Edu', false)])
+
+    await openOnlineDashboard()
+
+    // K=2 remotos estrangeiros + M=1 pendente estrangeiro = 3.
+    expect(within(foreignCard()).getByText('3')).toBeDefined()
+  })
+
+  it('online: zero usos mostra 0', async () => {
+    listAdminLeads.mockResolvedValue({ status: 'authorized', leads: [remoteRow('Ana')] })
+
+    await openOnlineDashboard()
+
+    expect(within(foreignCard()).getByText('0')).toBeDefined()
+  })
+
+  it('offline: conta os leads locais do dispositivo com o código', async () => {
+    setOnline(false)
+    getAllLeads.mockResolvedValue([
+      foreignLocal('Ana', true),
+      foreignLocal('Bia', false),
+      localRow('Caio', false),
+    ])
+
+    render(<AdminPanel config={makeConfig()} onClose={vi.fn()} />)
+    typeSecret('PIN de export offline', '1234')
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+    await screen.findByText('Painel Admin')
+
+    expect(within(foreignCard()).getByText('2')).toBeDefined()
+  })
+
+  it('excedente do código estrangeiro não aparece na reconciliação (critério 5)', async () => {
+    // 3 usos com limite 1 — um CPF real seria listado; o código nunca é.
+    listAdminLeads.mockResolvedValue({
+      status: 'authorized',
+      leads: [foreignRemote('Ana'), foreignRemote('Bia'), foreignRemote('Caio')],
+    })
+
+    await openOnlineDashboard()
+
+    expect(screen.getByText('Nenhum CPF excedeu o limite configurado.')).toBeDefined()
+    expect(screen.queryByText('111.***.**1-11')).toBeNull()
   })
 })
 

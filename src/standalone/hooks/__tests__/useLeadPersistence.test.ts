@@ -15,6 +15,7 @@ vi.mock('../../lib/leadsDb', () => ({ saveLead: saveLeadToDb, markSynced }))
 vi.mock('../../lib/leadsSync', () => ({ syncOnlineLead, syncPendingLeads }))
 
 import { useLeadPersistence } from '../useLeadPersistence'
+import { FOREIGN_CPF } from '../../../lead-capture/cpf/constants'
 
 const PARAMS = {
   eventId: 'evt-1',
@@ -70,5 +71,23 @@ describe('useLeadPersistence.saveLead', () => {
     const { result } = renderHook(() => useLeadPersistence())
     await result.current.saveLead(PARAMS)
     expect(markSynced).not.toHaveBeenCalled()
+  })
+
+  it('código de participante estrangeiro passa verbatim, sem special-case (HUB-109)', async () => {
+    const { result } = renderHook(() => useLeadPersistence())
+    await result.current.saveLead({
+      ...PARAMS,
+      cpf: FOREIGN_CPF,
+      cpfCheckSkipped: false,
+      maxParticipationsAtSubmit: 1, // snapshot honesto da config, mesmo sendo irrelevante
+    })
+
+    const expected = expect.objectContaining({
+      cpf: FOREIGN_CPF,
+      cpfCheckSkipped: false,
+      maxParticipationsAtSubmit: 1,
+    })
+    expect(saveLeadToDb).toHaveBeenCalledWith(expected)
+    expect(syncOnlineLead).toHaveBeenCalledWith(expected)
   })
 })

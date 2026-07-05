@@ -792,3 +792,86 @@ describe('LeadForm — gate de CPF (HUB-91)', () => {
     })
   })
 })
+
+describe('LeadForm — código de participante estrangeiro (HUB-109)', () => {
+  const FOREIGN_CPF_MASKED = '111.111.111-11'
+  const FOREIGN_CPF_DIGITS = '11111111111'
+  const CPF_INVALID_MESSAGE = 'CPF inválido. Confira os números digitados.'
+
+  const configWithLimit = (maxParticipations: number): GameConfig => {
+    const cfg = makeConfig(undefined)
+    cfg.leadForm.maxParticipations = maxParticipations
+    return cfg
+  }
+
+  it('digitar o código não mostra erro, não consulta e não abre spinner (critério 1)', () => {
+    render(<LeadForm config={makeConfig(undefined)} onSubmit={vi.fn()} />)
+    fireEvent.change(input('cpf'), { target: { value: FOREIGN_CPF_MASKED } })
+    expect(screen.queryByText(CPF_INVALID_MESSAGE)).toBeNull()
+    expect(screen.queryByTestId('cpf-spinner')).toBeNull()
+    expect(mockLookup).not.toHaveBeenCalled()
+    // Formulário permanece vazio para preenchimento manual (sem autofill nem selos).
+    expect(input('name').value).toBe('')
+    expect(screen.queryAllByText('Preenchido automaticamente').length).toBe(0)
+  })
+
+  it('nunca abre o modal de bloqueio, mesmo com maxParticipations = 1 (critério 2)', () => {
+    // Se o lookup rodasse, este resultado bloquearia — a ausência do modal prova o curto-circuito.
+    mockLookup.mockResolvedValue({ status: 'found', participationCount: 99, lastLeadData: null })
+    render(<LeadForm config={configWithLimit(1)} onSubmit={vi.fn()} />)
+    fireEvent.change(input('cpf'), { target: { value: FOREIGN_CPF_MASKED } })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(mockLookup).not.toHaveBeenCalled()
+  })
+
+  it('com consentimento + obrigatórios, ENVIAR habilita e o submit entrega o cpfMeta do código', () => {
+    const onSubmit = vi.fn()
+    render(<LeadForm config={makeConfig(undefined)} onSubmit={onSubmit} />)
+    fireEvent.change(input('cpf'), { target: { value: FOREIGN_CPF_MASKED } })
+    fireEvent.change(input('name'), { target: { value: 'John Doe' } })
+    fireEvent.change(input('email'), { target: { value: 'john@example.com' } })
+    acceptConsent()
+
+    const btn = screen.getByRole('button', { name: 'ENVIAR' }) as HTMLButtonElement
+    expect(btn.disabled).toBe(false)
+    fireEvent.click(btn)
+
+    expect(onSubmit).toHaveBeenCalledTimes(1)
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'John Doe', email: 'john@example.com' }),
+      { cpf: FOREIGN_CPF_DIGITS, cpfCheckSkipped: false }
+    )
+    expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('cpf')
+  })
+
+  it('submit com o código e campo obrigatório vazio mostra o erro do campo, não do CPF (risco R2)', () => {
+    const onSubmit = vi.fn()
+    render(<LeadForm config={makeConfig(undefined)} onSubmit={onSubmit} />)
+    fireEvent.change(input('cpf'), { target: { value: FOREIGN_CPF_MASKED } })
+    acceptConsent()
+    fireEvent.click(screen.getByRole('button', { name: 'ENVIAR' }))
+    expect(onSubmit).not.toHaveBeenCalled()
+    expect(screen.getByText('Nome completo é obrigatório')).toBeDefined()
+    // validate() também aceita o código: sem erro fantasma de CPF no submit.
+    expect(screen.queryByText(CPF_INVALID_MESSAGE)).toBeNull()
+  })
+
+  it.each(['000.000.000-00', '222.222.222-22'])(
+    'outra sequência repetida (%s) continua rejeitada na digitação e no submit (critério 6)',
+    (masked) => {
+      const onSubmit = vi.fn()
+      const { container } = render(
+        <LeadForm config={makeConfig(undefined)} onSubmit={onSubmit} />
+      )
+      fireEvent.change(input('cpf'), { target: { value: masked } })
+      expect(screen.getByText(CPF_INVALID_MESSAGE)).toBeDefined()
+      expect(mockLookup).not.toHaveBeenCalled()
+
+      fireEvent.change(input('name'), { target: { value: 'Maria' } })
+      fireEvent.change(input('email'), { target: { value: 'maria@exemplo.com' } })
+      acceptConsent()
+      fireEvent.submit(container.querySelector('form')!)
+      expect(onSubmit).not.toHaveBeenCalled()
+    }
+  )
+})

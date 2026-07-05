@@ -17,7 +17,7 @@ import {
 } from '../lead-capture/keyboard/caret'
 import { CPF_MASK, PHONE_MASK, type MaskSpec } from '../lead-capture/mask/maskSpec'
 import { CPF_DIGIT_COUNT, isValidCpf, sanitizeCpf } from '../lead-capture/cpf/cpfValidation'
-import { DEFAULT_MAX_PARTICIPATIONS } from '../lead-capture/cpf/constants'
+import { DEFAULT_MAX_PARTICIPATIONS, isForeignCpf } from '../lead-capture/cpf/constants'
 import {
   CaretOverlay,
   CONTENT_LEFT_OFFSET_PX,
@@ -192,8 +192,11 @@ export function LeadForm({ config, onSubmit, measureText }: LeadFormProps) {
     if (field.id === CPF_FIELD_ID) {
       const digits = sanitizeCpf(value)
       // Erro de dígito verificador só quando os 11 dígitos estão completos (decisão #1).
+      // O código de participante estrangeiro é aceito apesar de inválido (HUB-109).
       setCpfError(
-        digits.length === CPF_DIGIT_COUNT && !isValidCpf(digits) ? CPF_INVALID_MESSAGE : ''
+        digits.length === CPF_DIGIT_COUNT && !isValidCpf(digits) && !isForeignCpf(digits)
+          ? CPF_INVALID_MESSAGE
+          : ''
       )
       cpfGate.handleCpfChange(digits)
     } else if (cpfGate.autofilledFieldIds.has(field.id)) {
@@ -308,10 +311,12 @@ export function LeadForm({ config, onSubmit, measureText }: LeadFormProps) {
     setErrors(newErrors)
 
     const cpfDigits = sanitizeCpf(values[CPF_FIELD_ID] ?? '')
+    // Mesma exceção do handleChange (HUB-109): esquecer um dos dois pontos deixaria a
+    // UX inconsistente entre digitação e submit (risco R2).
     const cpfMessage =
       cpfDigits.length === 0
         ? `${CPF_LABEL} é obrigatório`
-        : !isValidCpf(cpfDigits)
+        : !isValidCpf(cpfDigits) && !isForeignCpf(cpfDigits)
           ? CPF_INVALID_MESSAGE
           : ''
     setCpfError(cpfMessage)

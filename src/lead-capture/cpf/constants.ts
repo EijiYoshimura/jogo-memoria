@@ -8,3 +8,15 @@
  * `0` (quando configurado explicitamente) significa ilimitado.
  */
 export const DEFAULT_MAX_PARTICIPATIONS = 1
+
+/**
+ * Código sentinela de participante estrangeiro (HUB-109). NÃO é um CPF válido —
+ * `isValidCpf` continua rejeitando-o; o gate o trata como exceção nomeada, sem
+ * consulta online, sem autofill e sem limite de participações.
+ */
+export const FOREIGN_CPF = '11111111111'
+
+/** `true` apenas para o código estrangeiro exato (dígitos já sanitizados). */
+export function isForeignCpf(digits: string): boolean {
+  return digits === FOREIGN_CPF
+}
