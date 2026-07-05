@@ -18,3 +18,5 @@ Registro dos worktrees git ativos por agente (modelo de isolamento — ver `CLAU
 | `dev-front` | HUB-92 | `dev-front/HUB-92-persistencia-cpf` | 2026-07-03 | PR #38, persistência + reconciliação + CSV, Done. Fecha o épico HUB-87. |
 | `dev-front` | HUB-94 | `dev-front/HUB-94-extrair-useconfig` | 2026-07-03 | PR #39, extrai `useConfig` (lint 0/0), Done. |
 | `product-owner` | HUB-96 | `docs/HUB-96-cpf-csv-lgpd` | 2026-07-03 | PR #40, ADR-013 CPF no CSV + LGPD (docs-only), Done. |
+| `dev-front` | HUB-109 | `dev-front/HUB-109-cpf-estrangeiro` | 2026-07-04 | PR #41, CPF estrangeiro 111.111.111-11 + card de contagem, Done. |
+| `qa` | HUB-109 | `qa/HUB-109-cpf-estrangeiro` | 2026-07-04 | Validação do PR #41 (QA APROVADO 7/7), sem commits. |
