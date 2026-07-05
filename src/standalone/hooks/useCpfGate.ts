@@ -6,6 +6,7 @@
 
 import { useCallback, useRef, useState } from 'react'
 import { CPF_DIGIT_COUNT, isValidCpf } from '../../lead-capture/cpf/cpfValidation'
+import { isForeignCpf } from '../../lead-capture/cpf/constants'
 import { checkCpfParticipation, type CpfLookupResult } from '../lib/cpfLookup'
 
 export type CpfGateState =
@@ -15,6 +16,7 @@ export type CpfGateState =
   | 'autofilled' // CPF encontrado abaixo do limite — demais campos autopreenchidos
   | 'blocked' // CPF encontrado no limite (modal de bloqueio)
   | 'new-offline' // consulta indisponível — tratado como novo, cpfCheckSkipped=true
+  | 'foreign' // código de participante estrangeiro — sem consulta, sem limite (HUB-109)
 
 /** `maxParticipations === 0` ⇒ ilimitado (nunca bloqueia — Cenário 5). */
 const UNLIMITED = 0
@@ -24,6 +26,7 @@ const SUBMIT_ENABLED: ReadonlySet<CpfGateState> = new Set<CpfGateState>([
   'new',
   'autofilled',
   'new-offline',
+  'foreign',
 ])
 
 export interface CpfGateCallbacks {
@@ -161,6 +164,12 @@ export function useCpfGate(params: UseCpfGateParams): CpfGate {
       if (sanitizedCpf === lookedUpCpfRef.current) return
       lookedUpCpfRef.current = sanitizedCpf
       invalidate()
+      // Antes do gatilho de isValidCpf, obrigatoriamente: o código estrangeiro é
+      // matematicamente inválido e nunca ativaria depois dele (HUB-109, risco R1).
+      if (isForeignCpf(sanitizedCpf)) {
+        setState('foreign') // sem lookup: idêntico online/offline, sem timeout
+        return
+      }
       // Gatilho automático: só dispara com 11 dígitos e checksum válido (decisão #1/#2).
       if (sanitizedCpf.length === CPF_DIGIT_COUNT && isValidCpf(sanitizedCpf)) {
         startLookup(sanitizedCpf)

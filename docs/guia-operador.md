@@ -15,6 +15,7 @@ Este guia descreve como configurar e operar o Jogo da Memória em um evento, do 
 7. [Consentimento LGPD](#consentimento-lgpd)
 8. [Teclado virtual](#teclado-virtual)
 9. [Durante o evento](#durante-o-evento)
+    - [Participantes estrangeiros (sem CPF)](#participantes-estrangeiros-sem-cpf)
 10. [Painel administrativo](#painel-administrativo)
 11. [Exportando leads](#exportando-leads)
     - [LGPD — o arquivo de leads exportado](#lgpd--o-arquivo-de-leads-exportado)
@@ -240,6 +241,22 @@ No painel admin (ver abaixo), acompanhe:
 
 Se houver muitos pendentes, acione **Forçar Sync** assim que a internet estiver disponível.
 
+### Participantes estrangeiros (sem CPF)
+
+Participantes estrangeiros que não possuem CPF podem jogar usando o **código
+`111.111.111-11`** no campo CPF:
+
+- Oriente o participante a digitar `111.111.111-11` e preencher os demais campos
+  normalmente (nome, e-mail etc. continuam obrigatórios, assim como o consentimento).
+- O código **não tem limite de participações**: nunca bloqueia, nunca autopreenche dados
+  de participante anterior e funciona igual online e offline.
+- A quantidade de participações com o código aparece no card **"Estrangeiros"** do painel
+  admin (no modo offline, conta apenas os leads locais do dispositivo).
+
+> **Apuração do sorteio:** as linhas com `11111111111` no CSV identificam **pessoas
+> distintas** sob o mesmo código — nunca deduplique nem apure por esse "CPF". Use os
+> demais campos (nome, e-mail, telefone) para distinguir os participantes.
+
 ---
 
 ## Painel administrativo
@@ -282,6 +299,7 @@ Após 3 tentativas incorretas, a entrada fica **bloqueada por 60 segundos**.
 | Total de leads | Quantidade de jogadas registradas no IndexedDB local |
 | Sincronizados | Leads já enviados ao Supabase |
 | Pendentes | Leads em fila de sync (offline) |
+| Estrangeiros | Participações com o código `111.111.111-11` (ver [Participantes estrangeiros](#participantes-estrangeiros-sem-cpf)) |
 | Forçar Sync | Drena a fila imediatamente (requer internet) |
 | Exportar CSV | Baixa arquivo com todos os leads (online + offline) |
 

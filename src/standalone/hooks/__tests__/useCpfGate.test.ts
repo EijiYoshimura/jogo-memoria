@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useCpfGate, type UseCpfGateParams } from '../useCpfGate'
+import { FOREIGN_CPF } from '../../../lead-capture/cpf/constants'
 import type { CpfLookupResult } from '../../lib/cpfLookup'
 
 // A consulta é sempre injetada nos testes; mockar o módulo evita carregar o supabaseClient
@@ -206,5 +207,89 @@ describe('useCpfGate', () => {
 
     // A resposta obsoleta não deve bloquear nem sair de idle.
     expect(view.result.current.state).toBe('idle')
+  })
+})
+
+describe('useCpfGate — código de participante estrangeiro (HUB-109)', () => {
+  it('código completo vai a foreign, libera submit e NUNCA consulta (risco R1)', () => {
+    const { view, lookup } = makeHarness()
+    act(() => view.result.current.handleCpfChange(FOREIGN_CPF))
+    expect(view.result.current.state).toBe('foreign')
+    expect(view.result.current.canSubmit).toBe(true)
+    expect(view.result.current.cpfCheckSkipped).toBe(false)
+    expect(view.result.current.autofilledFieldIds.size).toBe(0)
+    expect(lookup).not.toHaveBeenCalled()
+  })
+
+  it.each([1, 3])(
+    'nunca bloqueia com maxParticipations = %i (blocked inalcançável)',
+    (maxParticipations) => {
+      const { view, lookup } = makeHarness({ maxParticipations })
+      act(() => view.result.current.handleCpfChange(FOREIGN_CPF))
+      expect(view.result.current.state).toBe('foreign')
+      expect(view.result.current.canSubmit).toBe(true)
+      expect(lookup).not.toHaveBeenCalled()
+    }
+  )
+
+  it('editar de foreign para dígitos parciais volta a idle; CPF real válido dispara lookup', async () => {
+    const { view, lookup } = makeHarness()
+    act(() => view.result.current.handleCpfChange(FOREIGN_CPF))
+    act(() => view.result.current.handleCpfChange('111'))
+    expect(view.result.current.state).toBe('idle')
+    expect(view.result.current.canSubmit).toBe(false)
+
+    await act(async () => view.result.current.handleCpfChange(VALID_CPF))
+    expect(lookup).toHaveBeenCalledWith('e', VALID_CPF)
+    expect(view.result.current.state).toBe('new')
+  })
+
+  it('voltar do parcial ao código completo reativa foreign', () => {
+    const { view, lookup } = makeHarness()
+    act(() => view.result.current.handleCpfChange(FOREIGN_CPF))
+    act(() => view.result.current.handleCpfChange('111'))
+    act(() => view.result.current.handleCpfChange(FOREIGN_CPF))
+    expect(view.result.current.state).toBe('foreign')
+    expect(lookup).not.toHaveBeenCalled()
+  })
+
+  it('consulta in-flight de CPF real é descartada ao editar para o código (race)', async () => {
+    const { view, lookup } = makeHarness()
+    const resolveFirst = deferredLookup(lookup)
+
+    act(() => view.result.current.handleCpfChange(VALID_CPF)) // consulta pendente
+    act(() => view.result.current.handleCpfChange(FOREIGN_CPF))
+    await act(async () =>
+      resolveFirst({ status: 'found', participationCount: 5, lastLeadData: null })
+    )
+
+    // A resposta obsoleta (que bloquearia) é descartada pelo requestSeqRef existente.
+    expect(view.result.current.state).toBe('foreign')
+    expect(view.result.current.canSubmit).toBe(true)
+  })
+
+  it('editar de autofilled para o código limpa os campos autopreenchidos e vai a foreign', async () => {
+    const { view, values, lookup } = makeHarness({ maxParticipations: 2 })
+    lookup.mockResolvedValue({
+      status: 'found',
+      participationCount: 1,
+      lastLeadData: { name: 'Maria', email: 'maria@email.com', phone: '' },
+    })
+    await act(async () => view.result.current.handleCpfChange(VALID_CPF))
+    expect(values.name).toBe('Maria')
+
+    act(() => view.result.current.handleCpfChange(FOREIGN_CPF))
+    expect(values.name).toBe('')
+    expect(values.email).toBe('')
+    expect(view.result.current.state).toBe('foreign')
+    expect(view.result.current.autofilledFieldIds.size).toBe(0)
+  })
+
+  it('reset a partir de foreign volta a idle', () => {
+    const { view } = makeHarness()
+    act(() => view.result.current.handleCpfChange(FOREIGN_CPF))
+    act(() => view.result.current.reset())
+    expect(view.result.current.state).toBe('idle')
+    expect(view.result.current.canSubmit).toBe(false)
   })
 })

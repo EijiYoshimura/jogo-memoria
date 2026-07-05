@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { findParticipationOverages, type ReconciliationLead } from '../reconciliation'
+import { FOREIGN_CPF } from '../../../lead-capture/cpf/constants'
 
 function lead(overrides: Partial<ReconciliationLead> = {}): ReconciliationLead {
   return {
@@ -100,13 +101,37 @@ describe('findParticipationOverages', () => {
   })
 
   it('separa múltiplos CPFs excedentes no mesmo evento', () => {
+    // Fixture sem '11111111111': o valor virou o código estrangeiro (HUB-109) e é
+    // excluído por design — a intenção deste teste (separação por CPF) não muda.
     const overages = findParticipationOverages([
-      lead({ cpf: '11111111111' }),
-      lead({ cpf: '11111111111' }),
+      lead({ cpf: '44444444444' }),
+      lead({ cpf: '44444444444' }),
       lead({ cpf: '22222222222' }),
       lead({ cpf: '22222222222' }),
       lead({ cpf: '33333333333' }), // dentro do limite
     ])
-    expect(overages.map((o) => o.cpf).sort()).toEqual(['11111111111', '22222222222'])
+    expect(overages.map((o) => o.cpf).sort()).toEqual(['22222222222', '44444444444'])
+  })
+})
+
+describe('findParticipationOverages — código estrangeiro (HUB-109)', () => {
+  it('nunca lista o código, mesmo muito acima do limite e com linhas offline legadas', () => {
+    const overages = findParticipationOverages([
+      lead({ cpf: FOREIGN_CPF }),
+      lead({ cpf: FOREIGN_CPF }),
+      lead({ cpf: FOREIGN_CPF, cpfCheckSkipped: true }),
+      lead({ cpf: FOREIGN_CPF, cpfCheckSkipped: true }),
+    ])
+    expect(overages).toEqual([])
+  })
+
+  it('dataset misto: só o CPF real excedente é listado', () => {
+    const overages = findParticipationOverages([
+      lead({ cpf: FOREIGN_CPF }),
+      lead({ cpf: FOREIGN_CPF }),
+      lead({ cpf: '11122233344' }),
+      lead({ cpf: '11122233344' }),
+    ])
+    expect(overages.map((o) => o.cpf)).toEqual(['11122233344'])
   })
 })
