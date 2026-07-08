@@ -1,7 +1,10 @@
 # ADR-013 — CPF completo (não mascarado) no CSV de export do Admin
 
 **Data:** 2026-07-03
-**Status:** Aceito (decisão do stakeholder registrada em 2026-07-03 — ver seção "Decisão do stakeholder")
+**Status:** Substituído por ADR-014 (2026-07-07) — ver
+`docs/adr/ADR-014-mascarar-cpf-csv-supera-adr013.md`. O restante deste documento é mantido **como registro
+histórico** da decisão original e do seu racional; não reflete mais o comportamento vigente do sistema (o CSV
+passa a sair com o CPF mascarado).
 
 ## Contexto
 
