@@ -389,6 +389,7 @@ describe('AdminPanel — Limpeza de Leads (HUB-153)', () => {
 
   it('exige o match exato do código de confirmação antes de habilitar a exclusão', async () => {
     listAdminLeads.mockResolvedValue({ status: 'authorized', leads: [] })
+    purgeAdminLeads.mockResolvedValue({ status: 'purged', purgedCount: 0 })
     await openOnlineDashboard()
 
     fireEvent.click(screen.getByRole('button', { name: 'Limpeza de Leads' }))
@@ -402,6 +403,10 @@ describe('AdminPanel — Limpeza de Leads (HUB-153)', () => {
 
     confirmPurgeWithGeneratedCode()
     expect(purgeAdminLeads).not.toHaveBeenCalled() // ainda não resolveu — só habilitou o clique
+
+    // Aguarda o fluxo assíncrono disparado pelo clique terminar de resolver, evitando
+    // atualizações de estado fora de `act()` após o fim do teste.
+    await screen.findByText(/0 leads foram apagados/)
   })
 
   it('fluxo de sucesso completo: exporta, exclui remoto, limpa IndexedDB e zera o dashboard', async () => {
@@ -426,6 +431,31 @@ describe('AdminPanel — Limpeza de Leads (HUB-153)', () => {
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Fechar' }))
     // Dashboard zerado (Total, Sincronizados, Pendentes, Estrangeiros).
     expect(screen.getAllByText('0').length).toBeGreaterThanOrEqual(4)
+  })
+
+  it('não inclui no CSV de backup leads pendentes locais de outro evento (mesmo IndexedDB, totem compartilhado)', async () => {
+    listAdminLeads
+      .mockResolvedValueOnce({ status: 'authorized', leads: [] }) // login
+      .mockResolvedValueOnce({ status: 'authorized', leads: [] }) // export da limpeza
+    purgeAdminLeads.mockResolvedValue({ status: 'purged', purgedCount: 1 })
+    // IndexedDB não é particionado por evento: leads pendentes de um evento anterior
+    // convivem na mesma store com os do evento atual.
+    getAllLeads.mockResolvedValue([
+      { ...localRow('LeadOutroEvento', false), eventId: 'evento-anterior-2025' },
+      { ...localRow('LeadDesteEvento', false), eventId: 'evento-demo-2026' },
+    ])
+
+    await openOnlineDashboard()
+    fireEvent.click(screen.getByRole('button', { name: 'Limpeza de Leads' }))
+    confirmPurgeWithGeneratedCode()
+
+    await screen.findByText(/1 leads foram apagados/)
+    const createObjectURL = URL.createObjectURL as unknown as ReturnType<typeof vi.fn>
+    expect(createObjectURL).toHaveBeenCalledTimes(1)
+    const blob = createObjectURL.mock.calls[0][0] as Blob
+    const csvText = await blob.text()
+    expect(csvText).toContain('LeadDesteEvento')
+    expect(csvText).not.toContain('LeadOutroEvento')
   })
 
   it('estado (C): 1ª chamada falha (offline) — nada é apagado, purgeAdminLeads nunca é chamada', async () => {

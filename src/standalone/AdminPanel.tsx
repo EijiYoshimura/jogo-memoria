@@ -257,7 +257,10 @@ export function AdminPanel({ config, onClose }: AdminPanelProps) {
     }
 
     const allLocal = await getAllLeads()
-    const pending = allLocal.filter((lead) => !lead.synced)
+    // O IndexedDB não é particionado por evento (mesma store para qualquer evento já
+    // configurado neste totem) — sem o filtro por eventId, leads pendentes de um evento
+    // anterior vazariam para o CSV desta limpeza (HUB-153, achado do Tech Lead).
+    const pending = allLocal.filter((lead) => lead.eventId === config.event.id && !lead.synced)
     const csvContent = buildLeadsCsv(config, listResult.leads, pending)
     const filename = buildExportFilename()
     downloadCsv(csvContent, filename)
