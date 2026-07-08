@@ -1,10 +1,14 @@
 # ADR-013 — CPF completo (não mascarado) no CSV de export do Admin
 
 **Data:** 2026-07-03
-**Status:** Substituído por ADR-014 (2026-07-07) — ver
-`docs/adr/ADR-014-mascarar-cpf-csv-supera-adr013.md`. O restante deste documento é mantido **como registro
-histórico** da decisão original e do seu racional; não reflete mais o comportamento vigente do sistema (o CSV
-passa a sair com o CPF mascarado).
+**Status:** Aceito — decisão vigente, **não revertida**. **Complementada por ADR-014** (2026-07-07, ver
+`docs/adr/ADR-014-mascarar-cpf-csv-supera-adr013.md`): uma primeira leitura do pedido do stakeholder chegou a
+tratar "mascarar o CPF no CSV" como redação parcial (o que teria revertido esta ADR), mas o stakeholder
+corrigiu isso explicitamente — o pedido real é apenas **formatação com pontuação padrão**
+(`123.456.789-00`) sobre o mesmo CPF completo já decidido aqui. **Os 11 dígitos continuam saindo 100%
+visíveis, sem nenhum caractere oculto ou substituído** — a alternativa (b) desta ADR ("mascarar o CSV",
+redação parcial com `*`) permanece **rejeitada**, isso não muda. O restante deste documento continua
+refletindo o comportamento vigente do sistema (não é "registro histórico" de uma decisão substituída).
 
 ## Contexto
 
