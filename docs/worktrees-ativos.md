@@ -4,15 +4,16 @@ Registro dos worktrees git ativos por agente (modelo de isolamento — ver `CLAU
 
 | Agente | Issue | Branch | Worktree | Status | Criado em |
 |--------|-------|--------|----------|--------|-----------|
-| `dev-front` | HUB-149 | `dev-front/HUB-149-formatar-cpf-csv` | `.worktrees/dev-front/HUB-149-formatar-cpf-csv/` | In Progress | 2026-07-08 |
-| `dev-back` | HUB-151 | `dev-back/HUB-151-purge-leads-migration` | `.worktrees/dev-back/HUB-151-purge-leads-migration/` | In Progress | 2026-07-08 |
-| `qa` | HUB-149 | `qa/HUB-149-formatar-cpf-csv` | `.worktrees/qa/HUB-149-formatar-cpf-csv/` | In Progress | 2026-07-08 |
-| `qa` | HUB-151 | `qa/HUB-151-purge-leads-migration` | `.worktrees/qa/HUB-151-purge-leads-migration/` | In Progress | 2026-07-08 |
+| _(nenhum worktree ativo)_ | | | | | |
 
 ## Histórico
 
 | Agente | Issue | Branch | Removido em | Observação |
 |--------|-------|--------|-------------|------------|
+| `dev-front` | HUB-149 | `dev-front/HUB-149-formatar-cpf-csv` | 2026-07-08 | PR #43, formata CPF com pontuação no CSV, Done. |
+| `dev-back` | HUB-151 | `dev-back/HUB-151-purge-leads-migration` | 2026-07-08 | PR #44, migração `leads_purge_audit` + RPC `admin_purge_leads` (docs-only), Done. |
+| `qa` | HUB-149 | `qa/HUB-149-formatar-cpf-csv` | 2026-07-08 | Validação do PR #43 (QA APROVADO 6/6), sem commits. |
+| `qa` | HUB-151 | `qa/HUB-151-purge-leads-migration` | 2026-07-08 | Validação do PR #44 (QA APROVADO 7/7), sem commits. |
 | `dev-back` | HUB-88 | `dev-back/HUB-88-rls-leads-authz` | 2026-07-02 | PR #33, RLS de leads, Done. |
 | `dev-back` | HUB-89 | `dev-back/HUB-89-migracao-cpf-rpc` | 2026-07-02 | PR #34, migração CPF + RPC, Done. |
 | `dev-front` | HUB-90 | `dev-front/HUB-90-cpf-validacao-lib` | 2026-07-02 | PR #35, lib de validação de CPF, Done. |
