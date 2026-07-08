@@ -55,3 +55,21 @@ export async function markSynced(localId: number): Promise<void> {
     await db.put(STORE_NAME, { ...lead, synced: true })
   }
 }
+
+/**
+ * Remove deste dispositivo, do IndexedDB local, todos os leads (sincronizados e
+ * pendentes) de um evento — parte da Limpeza de Leads (HUB-150/ADR-015), executada
+ * **depois** da exclusão remota confirmada (`purgeAdminLeads`). Retorna a quantidade
+ * removida, para exibição/telemetria.
+ */
+export async function deleteLeadsForEvent(eventId: string): Promise<number> {
+  const db = await getDb()
+  const all = await db.getAll(STORE_NAME)
+  const matchingIds = all
+    .filter((lead) => lead.eventId === eventId)
+    .map((lead) => lead.localId)
+    .filter((localId): localId is number => localId !== undefined)
+
+  await Promise.all(matchingIds.map((localId) => db.delete(STORE_NAME, localId)))
+  return matchingIds.length
+}
