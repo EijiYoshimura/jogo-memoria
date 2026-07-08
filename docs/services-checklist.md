@@ -1,7 +1,7 @@
 # Checklist de Serviços — Jogo de Memória
 
 > Ações que você (operador/dono do projeto) precisa executar nos serviços externos para que a aplicação esteja pronta para produção.
-> Última atualização: 2026-07-02
+> Última atualização: 2026-07-07
 
 ---
 
@@ -275,6 +275,131 @@ SELECT * FROM check_cpf_participation('evento-demo-2026', '123');
 > migração, mantenha o SELECT anônimo em `leads` fechado (HUB-88). Como o CPF passa a viver nesta
 > tabela, um `SELECT *` anônimo aberto exporia identificador único de pessoa física — a RPC acima
 > **não** reabre esse acesso (só devolve contagem + último `data`).
+
+### Limpeza de Leads (HUB-150 / ADR-015)
+
+**Por quê:** a ativação é vinculada a sorteio/prêmio; depois da apuração, o operador precisa poder **apagar
+definitivamente** os leads do evento (redução de retenção de dado pessoal, LGPD). Esta é a **primeira operação
+de exclusão (`DELETE`)** do projeto sobre `leads` — até aqui todo objeto `SECURITY DEFINER` (`check_cpf_participation`,
+ADR-011; `admin_list_leads`, ADR-012) era só leitura. Por **decisão explícita do stakeholder** (ADR-015), o
+design usa **duas chamadas sequenciais**: o cliente primeiro lista/exporta os leads com a RPC/função já
+existente `admin_list_leads`/`listAdminLeads` (sem nenhuma alteração nela — não há nada a documentar sobre ela
+aqui) e só então chama a nova RPC abaixo, `admin_purge_leads`, que é **exclusivamente de exclusão** (não
+retorna as linhas — o cliente já as tem da chamada anterior). Essa separação em dois passos de rede reabre
+uma **janela de corrida** consciente e aceita entre as duas chamadas (um lead inserido nesse intervalo não
+entra no export mas é apagado pelo `DELETE` seguinte) — risco residual documentado e aceito em
+`docs/adr/ADR-015-admin-purge-leads-rpc-atomica.md`, não uma omissão.
+
+> ✅ **100% aditivo e idempotente.** Cria uma tabela nova (`leads_purge_audit`), um índice novo e uma RPC nova
+> — não altera nenhuma coluna, policy ou comportamento existente de `leads`, `admin_secrets` ou
+> `admin_list_leads`. Pode ser re-executado sem efeito colateral. Diferente do HUB-88, **não** exige ordem de
+> rollout com o deploy do cliente — mas, ao contrário do HUB-87, esta RPC **apaga dado real e irreversível**;
+> trate a chamada em produção com o mesmo cuidado de qualquer `DELETE` manual.
+
+**Rode o bloco inteiro no SQL Editor do Supabase:**
+
+```sql
+-- ── HUB-151 / ADR-015 — Limpeza de Leads: tabela de auditoria + RPC de exclusão (aditivo, idempotente) ──
+
+-- 1) Tabela de auditoria — independente de `leads`, sobrevive à exclusão.
+--    device_id identifica o DISPOSITIVO/sessão, não uma pessoa (não há usuário nomeado, ADR-012).
+CREATE TABLE IF NOT EXISTS leads_purge_audit (
+  id               uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
+  event_id         text        NOT NULL,
+  purged_count     integer     NOT NULL,
+  device_id        text        NOT NULL,
+  export_filename  text,
+  purged_at        timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE leads_purge_audit ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON leads_purge_audit FROM anon, authenticated;
+-- Sem policies: só a função SECURITY DEFINER abaixo escreve. Leitura, se necessária, via
+-- Supabase Table Editor/SQL Editor (privilégio de dono) — sem RPC de leitura nesta entrega (YAGNI).
+
+-- 2) Índice não-parcial em event_id — acelera este DELETE e também admin_list_leads
+--    (o índice existente idx_leads_event_cpf é parcial, WHERE cpf IS NOT NULL, não cobre tudo).
+CREATE INDEX IF NOT EXISTS idx_leads_event_id ON leads (event_id);
+
+-- 3) RPC de exclusão — SECURITY DEFINER, só apaga e audita; NÃO retorna linhas
+--    (o export já ocorreu antes, numa chamada separada do cliente a admin_list_leads).
+--    purged_count é sempre recalculado aqui dentro (nunca vem do cliente).
+CREATE OR REPLACE FUNCTION public.admin_purge_leads(
+  p_event_id        text,
+  p_secret          text,
+  p_device_id       text,
+  p_export_filename text DEFAULT NULL
+)
+RETURNS integer
+LANGUAGE plpgsql
+VOLATILE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_hash text;
+  v_purged_count integer;
+BEGIN
+  SELECT secret_hash INTO v_hash FROM admin_secrets WHERE event_id = p_event_id;
+  IF v_hash IS NULL OR extensions.crypt(p_secret, v_hash) <> v_hash THEN
+    RAISE EXCEPTION 'unauthorized' USING errcode = '28000';
+  END IF;
+
+  IF p_device_id IS NULL OR length(trim(p_device_id)) = 0 THEN
+    RAISE EXCEPTION 'invalid device id' USING errcode = '22023';
+  END IF;
+
+  WITH deleted AS (
+    DELETE FROM leads
+    WHERE event_id = p_event_id
+    RETURNING 1
+  )
+  SELECT count(*) INTO v_purged_count FROM deleted;
+
+  INSERT INTO leads_purge_audit (event_id, purged_count, device_id, export_filename)
+  VALUES (p_event_id, v_purged_count, p_device_id, p_export_filename);
+
+  RETURN v_purged_count;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.admin_purge_leads(text, text, text, text) FROM PUBLIC;
+GRANT  EXECUTE ON FUNCTION public.admin_purge_leads(text, text, text, text) TO anon;
+```
+
+**Validação (evidência para o PR/QA) — rode após a migração:**
+
+```sql
+-- a) A tabela de auditoria existe com as colunas esperadas
+SELECT column_name, data_type FROM information_schema.columns
+WHERE table_name = 'leads_purge_audit'
+  AND column_name IN ('id', 'event_id', 'purged_count', 'device_id', 'export_filename', 'purged_at');
+
+-- b) O índice não-parcial em event_id existe
+SELECT indexname FROM pg_indexes WHERE indexname = 'idx_leads_event_id';
+
+-- c) Segredo errado → unauthorized, nunca apaga nem audita
+SELECT admin_purge_leads('evento-demo-2026', '<senha errada>', 'device-teste-qa');
+-- esperado: ERROR: unauthorized
+
+-- d) device_id vazio → invalid device id, mesmo com segredo correto
+SELECT admin_purge_leads('evento-demo-2026', '<senha correta>', '');
+-- esperado: ERROR: invalid device id
+
+-- e) Segredo correto, event_id de teste sem leads → retorna 0 e audita a tentativa
+--    (troque 'evento-teste-sem-leads' por um event_id de teste, sem leads reais, antes de rodar)
+SELECT admin_purge_leads('evento-teste-sem-leads', '<senha correta>', 'device-teste-qa', 'export-teste.csv');
+-- esperado: retorno 0
+
+SELECT * FROM leads_purge_audit
+WHERE event_id = 'evento-teste-sem-leads'
+ORDER BY purged_at DESC LIMIT 1;
+-- esperado: 1 linha nova, purged_count = 0, device_id = 'device-teste-qa'
+```
+
+> **Atenção — esta RPC apaga dado real.** Rode o passo (e) da validação sempre contra um `event_id` de teste
+> **sem leads de produção** (crie um evento vazio dedicado, ex. `evento-teste-sem-leads`, ou confirme que o
+> `event_id` alvo já está vazio antes de rodar). Nunca use um `event_id` de evento real/em andamento apenas
+> para "testar" a função.
 
 ### Acesso admin aos leads (após o evento)
 
