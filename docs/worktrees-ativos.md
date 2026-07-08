@@ -4,13 +4,14 @@ Registro dos worktrees git ativos por agente (modelo de isolamento — ver `CLAU
 
 | Agente | Issue | Branch | Worktree | Status | Criado em |
 |--------|-------|--------|----------|--------|-----------|
-| `dev-front` | HUB-153 | `dev-front/HUB-153-purge-leads-ui` | `.worktrees/dev-front/HUB-153-purge-leads-ui/` | In Review | 2026-07-08 |
-| `qa` | HUB-153 | `qa/HUB-153-purge-leads-ui` | `.worktrees/qa/HUB-153-purge-leads-ui/` | In Progress | 2026-07-08 |
+| _(nenhum worktree ativo)_ | | | | | |
 
 ## Histórico
 
 | Agente | Issue | Branch | Removido em | Observação |
 |--------|-------|--------|-------------|------------|
+| `dev-front` | HUB-153 | `dev-front/HUB-153-purge-leads-ui` | 2026-07-08 | PR #46, modal + botão + wiring da Limpeza de Leads, Done. Fecha o épico HUB-150. |
+| `qa` | HUB-153 | `qa/HUB-153-purge-leads-ui` | 2026-07-08 | Validação do PR #46 (2 ciclos de correção: eventId no modal, escopo por evento no export — QA APROVADO 13/13). |
 | `dev-front` | HUB-152 | `dev-front/HUB-152-purge-leads-client-libs` | 2026-07-08 | PR #45, client libs purge/delete/deviceId, Done. |
 | `qa` | HUB-152 | `qa/HUB-152-purge-leads-client-libs` | 2026-07-08 | Validação do PR #45 (QA APROVADO 8/8), sem commits. |
 | `dev-front` | HUB-149 | `dev-front/HUB-149-formatar-cpf-csv` | 2026-07-08 | PR #43, formata CPF com pontuação no CSV, Done. |
