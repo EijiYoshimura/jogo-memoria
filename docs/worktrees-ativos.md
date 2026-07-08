@@ -4,7 +4,7 @@ Registro dos worktrees git ativos por agente (modelo de isolamento — ver `CLAU
 
 | Agente | Issue | Branch | Worktree | Status | Criado em |
 |--------|-------|--------|----------|--------|-----------|
-| _(nenhum worktree ativo)_ | | | | | |
+| `dev-front` | HUB-153 | `dev-front/HUB-153-purge-leads-ui` | `.worktrees/dev-front/HUB-153-purge-leads-ui/` | In Progress | 2026-07-08 |
 
 ## Histórico
 
