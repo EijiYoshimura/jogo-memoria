@@ -102,6 +102,7 @@ export function PurgeLeadsModal({
         {phase === 'confirm' && (
           <ConfirmStep
             eventName={eventName}
+            eventId={eventId}
             confirmationCode={confirmationCode}
             confirmationInput={confirmationInput}
             onInputChange={setConfirmationInput}
@@ -152,6 +153,7 @@ const bannerWarningClasses =
 
 interface ConfirmStepProps {
   eventName: string
+  eventId: string
   confirmationCode: string
   confirmationInput: string
   onInputChange: (value: string) => void
@@ -163,6 +165,7 @@ interface ConfirmStepProps {
 
 function ConfirmStep({
   eventName,
+  eventId,
   confirmationCode,
   confirmationInput,
   onInputChange,
@@ -176,6 +179,9 @@ function ConfirmStep({
       <h2 id={HEADING_ID} className="text-white text-2xl font-bold">
         Limpeza de Leads — {eventName}
       </h2>
+      <p className="text-gray-400 text-sm -mt-3">
+        Evento: {eventName} (ID: {eventId})
+      </p>
 
       <p
         role="alert"

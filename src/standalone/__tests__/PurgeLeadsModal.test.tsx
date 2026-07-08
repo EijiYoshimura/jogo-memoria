@@ -27,14 +27,21 @@ function baseProps(overrides: Partial<React.ComponentProps<typeof PurgeLeadsModa
 }
 
 describe('PurgeLeadsModal — estado (A) Confirmação', () => {
-  it('exibe o evento afetado, avisos de irreversibilidade/auditoria/sync e o código de confirmação', () => {
+  it('exibe o evento afetado (nome e id), avisos de irreversibilidade/auditoria/sync e o código de confirmação', () => {
     render(<PurgeLeadsModal {...baseProps()} />)
 
     expect(screen.getAllByText(/Evento Demo/).length).toBeGreaterThan(0)
+    expect(screen.getByText(/evento-demo-2026/)).toBeDefined()
     expect(screen.getByText(/irreversível/i)).toBeDefined()
     expect(screen.getByText(/não identifica um usuário nomeado/i)).toBeDefined()
     expect(screen.getByText(/Forçar Sync.*em todos os totens/i)).toBeDefined()
     expect(readGeneratedCode()).toMatch(/^[0-9A-F]{6}$/)
+  })
+
+  it('exibe o id do evento junto ao nome (critério de aceite 2 — nome E id do evento)', () => {
+    render(<PurgeLeadsModal {...baseProps({ eventName: 'Feira XPTO', eventId: 'feira-xpto-2026' })} />)
+
+    expect(screen.getByText('Evento: Feira XPTO (ID: feira-xpto-2026)')).toBeDefined()
   })
 
   it('o código gerado nunca é igual ao nome/id do evento (regenera em caso de colisão)', () => {
