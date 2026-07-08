@@ -1,11 +1,13 @@
 import { useState, useEffect, useMemo } from 'react'
 import type { GameConfig } from '../game/types'
-import { getAllLeads, getPendingLeads } from './lib/leadsDb'
+import { getAllLeads, getPendingLeads, deleteLeadsForEvent } from './lib/leadsDb'
 import { syncPendingLeads } from './lib/leadsSync'
-import { listAdminLeads, type RemoteLead } from './lib/adminLeads'
+import { listAdminLeads, purgeAdminLeads, type RemoteLead } from './lib/adminLeads'
 import { buildLeadsCsv } from './lib/leadsCsv'
 import { findParticipationOverages } from './lib/reconciliation'
 import { isForeignCpf } from '../lead-capture/cpf/constants'
+import { getOrCreateDeviceId } from './lib/deviceId'
+import { PurgeLeadsModal, type PurgePhase } from './PurgeLeadsModal'
 
 interface AdminPanelProps {
   config: GameConfig
@@ -17,6 +19,14 @@ type DashboardMode = 'online' | 'offline'
 
 const MAX_ATTEMPTS = 3
 const LOCKOUT_SECONDS = 60
+
+const SESSION_EXPIRED_MESSAGE = 'Sessão expirou. Reabra o painel e informe a senha novamente.'
+const OFFLINE_MESSAGE = 'Sem conexão.'
+
+/** Traduz um status de falha (não-exceção) de `listAdminLeads`/`purgeAdminLeads` para texto. */
+function describeAdminLeadsFailure(status: 'unauthorized' | 'offline'): string {
+  return status === 'unauthorized' ? SESSION_EXPIRED_MESSAGE : OFFLINE_MESSAGE
+}
 
 /** Total de dígitos de um CPF. */
 const CPF_DIGITS = 11
@@ -60,6 +70,14 @@ export function AdminPanel({ config, onClose }: AdminPanelProps) {
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncMessage, setSyncMessage] = useState('')
   const [statsError, setStatsError] = useState<string | null>(null)
+
+  // Limpeza de Leads (HUB-150/153/ADR-015): estado do modal de confirmação/orquestração.
+  const [showPurgeModal, setShowPurgeModal] = useState(false)
+  const [purgePhase, setPurgePhase] = useState<PurgePhase>('confirm')
+  const [purgedCount, setPurgedCount] = useState<number | null>(null)
+  const [purgeErrorDetail, setPurgeErrorDetail] = useState<string | null>(null)
+  // Retido para permitir "Tentar excluir novamente" (estado E) sem reexportar (passos 2-3).
+  const [purgeFilename, setPurgeFilename] = useState('')
 
   // Reconciliação: deriva os CPFs excedentes das linhas já autorizadas pela RPC —
   // sem nova chamada de rede. Informativo apenas; nenhuma escrita (Critério 7).
@@ -184,7 +202,7 @@ export function AdminPanel({ config, onClose }: AdminPanelProps) {
         setRemoteLeads(result.leads)
         await computeCounts(result.leads)
       } else if (result.status === 'unauthorized') {
-        setStatsError('Sessão expirou. Reabra o painel e informe a senha novamente.')
+        setStatsError(SESSION_EXPIRED_MESSAGE)
       } else {
         setStatsError('Sem conexão para atualizar os sincronizados.')
       }
@@ -197,15 +215,14 @@ export function AdminPanel({ config, onClose }: AdminPanelProps) {
     }
   }
 
-  async function handleExportCsv() {
-    const allLocal = await getAllLeads()
-    const csvContent =
-      mode === 'online'
-        ? buildLeadsCsv(config, remoteLeads, allLocal.filter((lead) => !lead.synced))
-        : buildLeadsCsv(config, [], allLocal)
-
+  /** Mesmo padrão de nome usado pelo export manual e pelo export automático da Limpeza de Leads. */
+  function buildExportFilename(): string {
     const today = new Date().toISOString().slice(0, 10)
-    const filename = `leads-${config.event.id}-${today}.csv`
+    return `leads-${config.event.id}-${today}.csv`
+  }
+
+  /** Dispara o download de um CSV já montado — reaproveitado pelo export manual e pela Limpeza de Leads. */
+  function downloadCsv(csvContent: string, filename: string) {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -215,6 +232,103 @@ export function AdminPanel({ config, onClose }: AdminPanelProps) {
     link.click()
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
+  }
+
+  async function handleExportCsv() {
+    const allLocal = await getAllLeads()
+    const csvContent =
+      mode === 'online'
+        ? buildLeadsCsv(config, remoteLeads, allLocal.filter((lead) => !lead.synced))
+        : buildLeadsCsv(config, [], allLocal)
+    downloadCsv(csvContent, buildExportFilename())
+  }
+
+  /**
+   * Limpeza de Leads (HUB-150/ADR-015) — duas chamadas de rede sequenciais, não uma RPC
+   * atômica única (decisão do stakeholder). Passo 1 (leitura + export): lê os leads via
+   * `listAdminLeads` e dispara o download; se falhar, nenhuma linha é tocada (estado C do
+   * modal). Retorna o nome do arquivo em caso de sucesso, para a chamada de exclusão.
+   */
+  async function exportForPurge(): Promise<string | null> {
+    const listResult = await listAdminLeads(config.event.id, authSecret)
+    if (listResult.status !== 'authorized') {
+      setPurgeErrorDetail(describeAdminLeadsFailure(listResult.status))
+      return null
+    }
+
+    const allLocal = await getAllLeads()
+    const pending = allLocal.filter((lead) => !lead.synced)
+    const csvContent = buildLeadsCsv(config, listResult.leads, pending)
+    const filename = buildExportFilename()
+    downloadCsv(csvContent, filename)
+    return filename
+  }
+
+  function resetDashboardCountsAfterPurge() {
+    setRemoteLeads([])
+    setSyncedLeads(0)
+    setPendingLeads(0)
+    setTotalLeads(0)
+    setForeignLeads(0)
+  }
+
+  /**
+   * Passo 2 (exclusão): só é chamado depois do export ter disparado com sucesso. Falha aqui
+   * não repete os passos 1/2 do export — estado (E) do modal, com "Tentar excluir novamente"
+   * reexecutando apenas esta função (`filename` e `authSecret` já retidos).
+   */
+  async function runPurgeDeletion(filename: string) {
+    setPurgePhase('deleting')
+    try {
+      const result = await purgeAdminLeads(config.event.id, authSecret, getOrCreateDeviceId(), filename)
+      if (result.status !== 'purged') {
+        setPurgeErrorDetail(describeAdminLeadsFailure(result.status))
+        setPurgePhase('partial-error')
+        return
+      }
+      await deleteLeadsForEvent(config.event.id)
+      resetDashboardCountsAfterPurge()
+      setPurgedCount(result.purgedCount)
+      setPurgePhase('success')
+    } catch (err: unknown) {
+      setPurgeErrorDetail(err instanceof Error ? err.message : 'erro desconhecido')
+      setPurgePhase('partial-error')
+    }
+  }
+
+  /** Confirmação inicial (estado A→B) e "Tentar novamente" do estado (C) — refaz o fluxo completo. */
+  async function handlePurgeConfirm() {
+    setPurgePhase('exporting')
+    setPurgeErrorDetail(null)
+    try {
+      const filename = await exportForPurge()
+      if (filename === null) {
+        setPurgePhase('export-error')
+        return
+      }
+      setPurgeFilename(filename)
+      await runPurgeDeletion(filename)
+    } catch (err: unknown) {
+      setPurgeErrorDetail(err instanceof Error ? err.message : 'erro desconhecido')
+      setPurgePhase('export-error')
+    }
+  }
+
+  /** "Tentar excluir novamente" do estado (E) — repete só a exclusão, sem reexportar. */
+  async function handleRetryPurgeOnly() {
+    setPurgeErrorDetail(null)
+    await runPurgeDeletion(purgeFilename)
+  }
+
+  function openPurgeModal() {
+    setPurgePhase('confirm')
+    setPurgedCount(null)
+    setPurgeErrorDetail(null)
+    setShowPurgeModal(true)
+  }
+
+  function closePurgeModal() {
+    setShowPurgeModal(false)
   }
 
   if (view === 'secret') {
@@ -375,6 +489,19 @@ export function AdminPanel({ config, onClose }: AdminPanelProps) {
             {isSyncing ? 'Sincronizando...' : 'Forçar Sync'}
           </button>
         )}
+        {mode === 'online' && (
+          <div className="border-t border-gray-800 pt-4 flex flex-col gap-2">
+            <button
+              className="bg-red-700 hover:bg-red-600 active:bg-red-800 text-white text-xl font-bold rounded-xl py-4 transition-colors"
+              onClick={openPurgeModal}
+            >
+              Limpeza de Leads
+            </button>
+            <p className="text-gray-400 text-xs">
+              Apaga os leads deste evento — ação irreversível.
+            </p>
+          </div>
+        )}
         <button
           className="bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-white text-xl font-bold rounded-xl py-4 transition-colors"
           onClick={onClose}
@@ -382,6 +509,20 @@ export function AdminPanel({ config, onClose }: AdminPanelProps) {
           Fechar
         </button>
       </div>
+
+      {showPurgeModal && (
+        <PurgeLeadsModal
+          eventName={config.event.name}
+          eventId={config.event.id}
+          phase={purgePhase}
+          purgedCount={purgedCount}
+          errorDetail={purgeErrorDetail}
+          onConfirm={handlePurgeConfirm}
+          onRetryExport={handlePurgeConfirm}
+          onRetryDelete={handleRetryPurgeOnly}
+          onClose={closePurgeModal}
+        />
+      )}
     </div>
   )
 }

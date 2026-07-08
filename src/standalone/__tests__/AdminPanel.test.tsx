@@ -5,15 +5,24 @@ import type { RemoteLead } from '../lib/adminLeads'
 import type { LocalLead } from '../lib/leadsDb'
 import { FOREIGN_CPF } from '../../lead-capture/cpf/constants'
 
-const { listAdminLeads, getAllLeads, getPendingLeads, syncPendingLeads } = vi.hoisted(() => ({
+const {
+  listAdminLeads,
+  purgeAdminLeads,
+  getAllLeads,
+  getPendingLeads,
+  deleteLeadsForEvent,
+  syncPendingLeads,
+} = vi.hoisted(() => ({
   listAdminLeads: vi.fn(),
+  purgeAdminLeads: vi.fn(),
   getAllLeads: vi.fn(),
   getPendingLeads: vi.fn(),
+  deleteLeadsForEvent: vi.fn(),
   syncPendingLeads: vi.fn(),
 }))
 
-vi.mock('../lib/adminLeads', () => ({ listAdminLeads }))
-vi.mock('../lib/leadsDb', () => ({ getAllLeads, getPendingLeads }))
+vi.mock('../lib/adminLeads', () => ({ listAdminLeads, purgeAdminLeads }))
+vi.mock('../lib/leadsDb', () => ({ getAllLeads, getPendingLeads, deleteLeadsForEvent }))
 vi.mock('../lib/leadsSync', () => ({ syncPendingLeads }))
 
 import { AdminPanel } from '../AdminPanel'
@@ -320,5 +329,160 @@ describe('AdminPanel — modo offline com gate local (HUB-88)', () => {
     expect(screen.getByText('1')).toBeDefined()
     // Forçar Sync não é oferecido offline
     expect(screen.queryByRole('button', { name: /Forçar Sync/ })).toBeNull()
+  })
+})
+
+describe('AdminPanel — Limpeza de Leads (HUB-153)', () => {
+  function readGeneratedCode(): string {
+    return screen.getByText((_, el) => el?.id === 'purge-confirmation-code').textContent ?? ''
+  }
+
+  function confirmPurgeWithGeneratedCode() {
+    const code = readGeneratedCode()
+    fireEvent.change(screen.getByLabelText(/código abaixo exatamente como exibido/i), {
+      target: { value: code },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Apagar leads deste evento' }))
+  }
+
+  async function openOnlineDashboard() {
+    render(<AdminPanel config={makeConfig()} onClose={vi.fn()} />)
+    typeSecret('Senha do painel admin', 'passphrase')
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+    await screen.findByText('Painel Admin')
+  }
+
+  beforeEach(() => {
+    listAdminLeads.mockReset()
+    purgeAdminLeads.mockReset()
+    getAllLeads.mockReset().mockResolvedValue([])
+    getPendingLeads.mockReset().mockResolvedValue([])
+    deleteLeadsForEvent.mockReset().mockResolvedValue(0)
+    syncPendingLeads.mockReset().mockResolvedValue(undefined)
+    setOnline(true)
+    vi.stubGlobal('URL', {
+      ...URL,
+      createObjectURL: vi.fn<(blob: Blob) => string>(() => 'blob:mock'),
+      revokeObjectURL: vi.fn(),
+    })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  it('o botão "Limpeza de Leads" aparece no modo online', async () => {
+    listAdminLeads.mockResolvedValue({ status: 'authorized', leads: [] })
+    await openOnlineDashboard()
+    expect(screen.getByRole('button', { name: 'Limpeza de Leads' })).toBeDefined()
+  })
+
+  it('o botão "Limpeza de Leads" não aparece no modo offline', async () => {
+    setOnline(false)
+    render(<AdminPanel config={makeConfig()} onClose={vi.fn()} />)
+    typeSecret('PIN de export offline', '1234')
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+    await screen.findByText('Painel Admin')
+    expect(screen.queryByRole('button', { name: 'Limpeza de Leads' })).toBeNull()
+  })
+
+  it('exige o match exato do código de confirmação antes de habilitar a exclusão', async () => {
+    listAdminLeads.mockResolvedValue({ status: 'authorized', leads: [] })
+    await openOnlineDashboard()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Limpeza de Leads' }))
+    const confirmButton = screen.getByRole('button', { name: 'Apagar leads deste evento' })
+    expect(confirmButton).toHaveProperty('disabled', true)
+
+    fireEvent.change(screen.getByLabelText(/código abaixo exatamente como exibido/i), {
+      target: { value: 'errado' },
+    })
+    expect(confirmButton).toHaveProperty('disabled', true)
+
+    confirmPurgeWithGeneratedCode()
+    expect(purgeAdminLeads).not.toHaveBeenCalled() // ainda não resolveu — só habilitou o clique
+  })
+
+  it('fluxo de sucesso completo: exporta, exclui remoto, limpa IndexedDB e zera o dashboard', async () => {
+    listAdminLeads
+      .mockResolvedValueOnce({ status: 'authorized', leads: [remoteRow('Ana')] }) // login
+      .mockResolvedValueOnce({ status: 'authorized', leads: [remoteRow('Ana')] }) // export da limpeza
+    purgeAdminLeads.mockResolvedValue({ status: 'purged', purgedCount: 5 })
+
+    await openOnlineDashboard()
+    fireEvent.click(screen.getByRole('button', { name: 'Limpeza de Leads' }))
+    confirmPurgeWithGeneratedCode()
+
+    expect(await screen.findByText(/5 leads foram apagados/)).toBeDefined()
+    expect(purgeAdminLeads).toHaveBeenCalledWith(
+      'evento-demo-2026',
+      'passphrase',
+      expect.any(String),
+      expect.stringMatching(/^leads-evento-demo-2026-\d{4}-\d{2}-\d{2}\.csv$/),
+    )
+    expect(deleteLeadsForEvent).toHaveBeenCalledWith('evento-demo-2026')
+
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Fechar' }))
+    // Dashboard zerado (Total, Sincronizados, Pendentes, Estrangeiros).
+    expect(screen.getAllByText('0').length).toBeGreaterThanOrEqual(4)
+  })
+
+  it('estado (C): 1ª chamada falha (offline) — nada é apagado, purgeAdminLeads nunca é chamada', async () => {
+    listAdminLeads
+      .mockResolvedValueOnce({ status: 'authorized', leads: [] }) // login
+      .mockResolvedValueOnce({ status: 'offline' }) // export da limpeza falha
+
+    await openOnlineDashboard()
+    fireEvent.click(screen.getByRole('button', { name: 'Limpeza de Leads' }))
+    confirmPurgeWithGeneratedCode()
+
+    expect(
+      await screen.findByText('A exportação falhou, então nada foi apagado — está tudo como antes.')
+    ).toBeDefined()
+    expect(purgeAdminLeads).not.toHaveBeenCalled()
+    expect(deleteLeadsForEvent).not.toHaveBeenCalled()
+  })
+
+  it('estado (E): export ok, exclusão falha (unauthorized) — CSV já baixado, nada localmente apagado', async () => {
+    listAdminLeads
+      .mockResolvedValueOnce({ status: 'authorized', leads: [remoteRow('Ana')] }) // login
+      .mockResolvedValueOnce({ status: 'authorized', leads: [remoteRow('Ana')] }) // export
+    purgeAdminLeads.mockResolvedValueOnce({ status: 'unauthorized' })
+
+    await openOnlineDashboard()
+    fireEvent.click(screen.getByRole('button', { name: 'Limpeza de Leads' }))
+    confirmPurgeWithGeneratedCode()
+
+    expect(
+      await screen.findByText(
+        'O arquivo CSV já foi salvo — nada foi perdido. Mas não foi possível concluir a exclusão.'
+      )
+    ).toBeDefined()
+    expect(deleteLeadsForEvent).not.toHaveBeenCalled()
+  })
+
+  it('"Tentar excluir novamente" no estado (E) repete só a exclusão, sem rechamar a leitura/export', async () => {
+    listAdminLeads
+      .mockResolvedValueOnce({ status: 'authorized', leads: [remoteRow('Ana')] }) // login
+      .mockResolvedValueOnce({ status: 'authorized', leads: [remoteRow('Ana')] }) // export
+    purgeAdminLeads
+      .mockResolvedValueOnce({ status: 'offline' })
+      .mockResolvedValueOnce({ status: 'purged', purgedCount: 3 })
+
+    await openOnlineDashboard()
+    fireEvent.click(screen.getByRole('button', { name: 'Limpeza de Leads' }))
+    confirmPurgeWithGeneratedCode()
+    await screen.findByText(
+      'O arquivo CSV já foi salvo — nada foi perdido. Mas não foi possível concluir a exclusão.'
+    )
+
+    const listCallsBeforeRetry = listAdminLeads.mock.calls.length
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar excluir novamente' }))
+
+    expect(await screen.findByText(/3 leads foram apagados/)).toBeDefined()
+    expect(listAdminLeads.mock.calls.length).toBe(listCallsBeforeRetry)
+    expect(purgeAdminLeads).toHaveBeenCalledTimes(2)
+    expect(deleteLeadsForEvent).toHaveBeenCalledWith('evento-demo-2026')
   })
 })
