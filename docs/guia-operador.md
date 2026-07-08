@@ -17,6 +17,7 @@ Este guia descreve como configurar e operar o Jogo da Memória em um evento, do 
 9. [Durante o evento](#durante-o-evento)
     - [Participantes estrangeiros (sem CPF)](#participantes-estrangeiros-sem-cpf)
 10. [Painel administrativo](#painel-administrativo)
+    - [Limpeza de leads](#limpeza-de-leads)
 11. [Exportando leads](#exportando-leads)
     - [LGPD — o arquivo de leads exportado](#lgpd--o-arquivo-de-leads-exportado)
 12. [Pós-evento — conferência de dados](#pós-evento--conferência-de-dados)
@@ -302,6 +303,7 @@ Após 3 tentativas incorretas, a entrada fica **bloqueada por 60 segundos**.
 | Estrangeiros | Participações com o código `111.111.111-11` (ver [Participantes estrangeiros](#participantes-estrangeiros-sem-cpf)) |
 | Forçar Sync | Drena a fila imediatamente (requer internet) |
 | Exportar CSV | Baixa arquivo com todos os leads (online + offline) |
+| Limpeza de Leads | Exporta um backup automático e então apaga definitivamente os leads do evento (ver [seção abaixo](#limpeza-de-leads); só disponível online) |
 
 ---
 
@@ -364,6 +366,38 @@ concluída a tempo). O CPF é exibido parcialmente mascarado (ex.: `123.***.**9-
 É um relatório **estritamente informativo** para apoiar a apuração do sorteio: o sistema
 **não** reverte nem invalida nenhuma participação automaticamente. A decisão sobre um CPF
 excedente é sempre humana.
+
+### Limpeza de Leads
+
+Disponível apenas no painel **online** (autenticado com a senha do Admin), o botão **Limpeza de
+Leads** apaga **definitivamente** os leads do evento carregado, tanto no Supabase quanto no
+IndexedDB deste dispositivo — reduzindo a retenção de dados pessoais depois de concluída a
+apuração do sorteio.
+
+**Antes de confirmar:**
+
+- **Use "Forçar Sync" em todos os totens do evento.** A exclusão local (IndexedDB) só alcança o
+  dispositivo que executa a limpeza. Um totem com leads pendentes ainda não sincronizados **vai
+  sincronizá-los normalmente depois**, reintroduzindo no Supabase dados que você acreditava
+  apagados. Sincronizar todos os totens antes é a única forma de evitar isso — não há mitigação
+  técnica automática.
+- **A ação é irreversível.** Um export completo (CSV com o CPF completo, formatado) é gerado e
+  baixado automaticamente antes da exclusão — guarde-o com o mesmo cuidado de LGPD descrito em
+  ["LGPD — o arquivo de leads exportado"](#lgpd--o-arquivo-de-leads-exportado): é o único registro
+  que sobra depois da exclusão.
+- **A trilha de auditoria não identifica um usuário nomeado** — apenas o dispositivo e a sessão
+  que executaram a operação (o painel usa uma senha compartilhada, sem login individual).
+
+**Fluxo:** o modal exige digitar de volta um código de confirmação gerado na hora (evita clique
+acidental; não é um controle de segurança — quem tem a senha do Admin já controla a operação).
+Depois de confirmado, o app exporta o backup e só então chama a exclusão remota — se a exportação
+falhar, nada é apagado; se só a exclusão falhar (export já baixado), o app oferece "tentar excluir
+novamente" sem gerar um novo arquivo.
+
+> **Risco residual aceito (ADR-015): janela de corrida entre exportar e apagar.** Um lead
+> capturado entre o momento do export e o momento da exclusão **não aparece no CSV** mas **é
+> apagado** mesmo assim. Não há lock técnico contra isso nesta versão — evite novas capturas
+> durante a limpeza sempre que possível.
 
 ---
 
