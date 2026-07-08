@@ -4,7 +4,8 @@ Registro dos worktrees git ativos por agente (modelo de isolamento — ver `CLAU
 
 | Agente | Issue | Branch | Worktree | Status | Criado em |
 |--------|-------|--------|----------|--------|-----------|
-| _(nenhum worktree ativo)_ | | | | | |
+| `dev-front` | HUB-149 | `dev-front/HUB-149-formatar-cpf-csv` | `.worktrees/dev-front/HUB-149-formatar-cpf-csv/` | In Progress | 2026-07-08 |
+| `dev-back` | HUB-151 | `dev-back/HUB-151-purge-leads-migration` | `.worktrees/dev-back/HUB-151-purge-leads-migration/` | In Progress | 2026-07-08 |
 
 ## Histórico
 
