@@ -57,16 +57,22 @@ describe('buildLeadsCsv', () => {
     expect(csv).toBe('Nome,E-mail,cpf,played_at,score,time_taken,synced_from')
   })
 
-  it('inclui linhas remotas e locais na ordem remoto → local com a coluna CPF', () => {
+  it('inclui linhas remotas e locais na ordem remoto → local com a coluna CPF formatada', () => {
     const csv = buildLeadsCsv(makeConfig(), [remote], [local])
     const lines = csv.split('\n')
     expect(lines).toHaveLength(3)
     expect(lines[1]).toBe(
-      '"Ana","ana@example.com","11122233344","2026-07-02T12:00:00Z","6","42","online"'
+      '"Ana","ana@example.com","111.222.333-44","2026-07-02T12:00:00Z","6","42","online"'
     )
     expect(lines[2]).toBe(
-      '"Bruno","bruno@example.com","55566677788","2026-07-02T13:00:00Z","4","55","offline-sync"'
+      '"Bruno","bruno@example.com","555.666.777-88","2026-07-02T13:00:00Z","4","55","offline-sync"'
     )
+  })
+
+  it('formata o CPF sentinela de estrangeiro (111.111.111-11) sem tratamento especial', () => {
+    const foreigner: RemoteLead = { ...remote, cpf: '11111111111' }
+    const csv = buildLeadsCsv(makeConfig(), [foreigner], [])
+    expect(csv.split('\n')[1]).toContain('"111.111.111-11"')
   })
 
   it('trata cpf/score/time_taken nulos e campo ausente como célula vazia', () => {
@@ -85,6 +91,15 @@ describe('buildLeadsCsv', () => {
     const lines = csv.split('\n')
     // cpf nulo → célula vazia; synced_from nulo cai no fallback "online"
     expect(lines[1]).toBe('"Sem Email","","","","","","online"')
+  })
+
+  it('trata cpf de string vazia como célula vazia, sem lançar erro', () => {
+    const emptyCpf: RemoteLead = { ...remote, cpf: '' }
+    expect(() => buildLeadsCsv(makeConfig(), [emptyCpf], [])).not.toThrow()
+    const csv = buildLeadsCsv(makeConfig(), [emptyCpf], [])
+    expect(csv.split('\n')[1]).toBe(
+      '"Ana","ana@example.com","","2026-07-02T12:00:00Z","6","42","online"'
+    )
   })
 
   it('escapa aspas duplicando-as (proteção de CSV)', () => {
